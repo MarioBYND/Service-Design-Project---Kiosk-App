@@ -1651,19 +1651,24 @@ html, body {
 
 .scroll-hint.hidden { opacity: 0; }
 
-/* CSS chevron arrow — no emoji, scales cleanly */
+/* Three static dots — static, barely visible */
 .scroll-hint-chevron {
-  width: 22px;
-  height: 22px;
-  border-right: 2.5px solid var(--gray-3);
-  border-bottom: 2.5px solid var(--gray-3);
-  transform: rotate(45deg) translateY(-3px);
-  animation: scroll-bounce 1.6s ease-in-out infinite;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.28;
 }
 
-@keyframes scroll-bounce {
-  0%, 100% { transform: rotate(45deg) translateY(-3px); }
-  50%       { transform: rotate(45deg) translateY(4px);  }
+.scroll-hint-chevron::before,
+.scroll-hint-chevron::after,
+.scroll-hint-dot {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--gray-3);
 }
 
 

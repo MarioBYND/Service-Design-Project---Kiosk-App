@@ -70,7 +70,7 @@ function makeBottomNav(activeItem = 'home') {
 function addScrollHint(screen, scrollEl) {
   const hint = document.createElement('div');
   hint.className = 'scroll-hint';
-  hint.innerHTML = '<div class="scroll-hint-chevron"></div>';
+  hint.innerHTML = '<div class="scroll-hint-chevron"><span class="scroll-hint-dot"></span></div>';
   screen.appendChild(hint);
   scrollEl.addEventListener('scroll', () => hint.classList.add('hidden'), { once: true, passive: true });
 }
