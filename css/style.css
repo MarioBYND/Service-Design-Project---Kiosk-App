@@ -1643,7 +1643,7 @@ html, body {
 /* ── Scroll hint (charging + help screens) ──────────────────── */
 .scroll-hint {
   position: absolute;
-  bottom: var(--nav-h);   /* sits flush above the bottom nav */
+  bottom: calc(var(--nav-h) + 14px);  /* lifted off the nav bar */
   left: 0;
   right: 0;
   height: 80px;
@@ -1674,7 +1674,7 @@ html, body {
   bottom: 0;
   width: 15px;
   height: 3px;
-  background: var(--gray-3);
+  background: var(--gray-3);   /* default — overridden by colour variants below */
   border-radius: 3px;
 }
 
@@ -1688,6 +1688,17 @@ html, body {
   right: 0;
   transform: rotate(-35deg);
   transform-origin: right center;
+}
+
+/* Colour variants — passed as a class from addScrollHint() */
+.scroll-hint--lime .scroll-hint-chevron::before,
+.scroll-hint--lime .scroll-hint-chevron::after {
+  background: var(--lime-dk);
+}
+
+.scroll-hint--purple .scroll-hint-chevron::before,
+.scroll-hint--purple .scroll-hint-chevron::after {
+  background: var(--purple);
 }
 
 @keyframes hint-pulse {
