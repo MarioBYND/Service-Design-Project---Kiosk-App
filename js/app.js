@@ -64,6 +64,18 @@ function makeBottomNav(activeItem = 'home') {
 }
 
 
+// ── Scroll hint ───────────────────────────────────────────────
+// Shows a gradient fade + bouncing chevron at the bottom of `screen`
+// and hides it the moment the user scrolls `scrollEl`.
+function addScrollHint(screen, scrollEl) {
+  const hint = document.createElement('div');
+  hint.className = 'scroll-hint';
+  hint.innerHTML = '<div class="scroll-hint-chevron"></div>';
+  screen.appendChild(hint);
+  scrollEl.addEventListener('scroll', () => hint.classList.add('hidden'), { once: true, passive: true });
+}
+
+
 // ════════════════════════════════════════════════════════════
 //  HOME
 // ════════════════════════════════════════════════════════════
@@ -802,6 +814,7 @@ Router.register('charge', ({ spotId } = {}) => {
     });
   });
 
+  addScrollHint(screen, screen.querySelector('.charge-list-scroll'));
   screen.appendChild(makeBottomNav('home'));
   return screen;
 });
@@ -893,6 +906,7 @@ Router.register('help', () => {
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('home'));
   Wayfinding.initialize(screen.querySelector('#help-map'))
     .then(() => Wayfinding.drawRoute('east-exit'));
+  addScrollHint(screen, screen.querySelector('.charge-list-scroll'));
   screen.appendChild(makeBottomNav('help'));
   return screen;
 });
