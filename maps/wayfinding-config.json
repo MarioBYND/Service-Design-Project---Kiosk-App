@@ -1,0 +1,47 @@
+{
+  "calibration": {
+    "offsetX": 8.5,
+    "offsetY": -3,
+    "scaleX": 0.97,
+    "scaleY": 0.97
+  },
+  "kioskId": "lobby",
+  "visibleLabelIds": ["main-entrance", "east-exit"],
+  "manualPathAttachments": {
+    "main-entrance": ["Path 1"],
+    "lobby": ["Path 2"],
+    "east-exit": ["Path 2"],
+    "studio-a": ["Path 3"],
+    "computer-lab": ["Path 3"],
+    "room-13": ["Path 3"],
+    "room-12": ["Path 4"],
+    "room-11": ["Path 5"],
+    "room-10": ["Path 5"],
+    "room-9": ["Path 5"],
+    "room-7": ["Path 5"],
+    "room-8": ["Path 6"],
+    "room-6": ["Path 6"]
+  },
+  "rooms": [
+    { "id": "main-entrance", "name": "Main Entrance", "markerType": "entrance",  "xPct": 58.62, "yPct": 81.58 },
+    { "id": "lobby",         "name": "Kiosk",         "markerType": "kiosk",     "xPct": 74.37, "yPct": 78.10 },
+    { "id": "studio-a",      "name": "Printer 1",     "markerType": "printer",   "xPct": 63.81, "yPct": 54.60 },
+    { "id": "computer-lab",  "name": "Printer 2",     "markerType": "printer",   "xPct": 63.81, "yPct": 58.08 },
+    { "id": "east-exit",     "name": "Service Desk",  "markerType": "service",   "xPct": 75.76, "yPct": 69.95 },
+    { "id": "room-6",        "name": "Charging Spot 1","markerType": "charging", "xPct": 17.39, "yPct": 21.50 },
+    { "id": "room-7",        "name": "Charging Spot 2","markerType": "charging", "xPct": 16.92, "yPct": 37.69 },
+    { "id": "room-8",        "name": "Bookshelf E",   "markerType": "bookshelf", "xPct":  7.93, "yPct": 23.66 },
+    { "id": "room-9",        "name": "Bookshelf D",   "markerType": "bookshelf", "xPct":  8.31, "yPct": 36.37 },
+    { "id": "room-10",       "name": "Bookshelf C",   "markerType": "bookshelf", "xPct":  8.40, "yPct": 49.44 },
+    { "id": "room-11",       "name": "Bookshelf B",   "markerType": "bookshelf", "xPct": 18.40, "yPct": 52.20 },
+    { "id": "room-12",       "name": "Bookshelf A",   "markerType": "bookshelf", "xPct": 31.93, "yPct": 52.44 },
+    { "id": "room-13",       "name": "Computers",     "markerType": "computer",  "xPct": 51.02, "yPct": 62.27 },
+
+    { "id": "destination-14", "name": "Path 1", "xPct": 58.62, "yPct": 81.58 },
+    { "id": "destination-15", "name": "Path 2", "xPct": 60.00, "yPct": 63.00 },
+    { "id": "destination-16", "name": "Path 3", "xPct": 50.00, "yPct": 49.00 },
+    { "id": "destination-18", "name": "Path 4", "xPct": 32.03, "yPct": 44.05 },
+    { "id": "destination-19", "name": "Path 5", "xPct": 12.20, "yPct": 43.81 },
+    { "id": "destination-20", "name": "Path 6", "xPct": 11.92, "yPct": 24.38 }
+  ]
+}
