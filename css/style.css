@@ -164,6 +164,7 @@ html, body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   min-height: 0;
 }
 
@@ -331,6 +332,7 @@ html, body {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .screen-body::-webkit-scrollbar { display: none; }
@@ -516,6 +518,7 @@ html, body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 0 14px;
 }
 
@@ -660,6 +663,7 @@ html, body {
   overflow-x: auto;
   flex-shrink: 0;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
 }
 
 .genre-chips::-webkit-scrollbar { display: none; }
@@ -690,6 +694,7 @@ html, body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 0 14px;
   min-height: 0;
 }
@@ -763,6 +768,7 @@ html, body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .charge-list-scroll::-webkit-scrollbar { display: none; }
@@ -1516,6 +1522,7 @@ html, body {
 .wizard-body-scroll {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .wizard-prompt {
@@ -1579,6 +1586,7 @@ html, body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 0 14px;
   min-height: 0;
 }
@@ -1651,12 +1659,12 @@ html, body {
 
 .scroll-hint.hidden { opacity: 0; }
 
-/* Single downward chevron — static, clearly directional */
+/* Single downward chevron — pulsing opacity, clearly directional */
 .scroll-hint-chevron {
-  width: 20px;
-  height: 11px;
-  opacity: 0.45;
+  width: 26px;
+  height: 14px;
   position: relative;
+  animation: hint-pulse 2s ease-in-out infinite;
 }
 
 .scroll-hint-chevron::before,
@@ -1664,10 +1672,10 @@ html, body {
   content: '';
   position: absolute;
   bottom: 0;
-  width: 12px;
-  height: 2px;
+  width: 15px;
+  height: 3px;
   background: var(--gray-3);
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
 .scroll-hint-chevron::before {
@@ -1680,6 +1688,11 @@ html, body {
   right: 0;
   transform: rotate(-35deg);
   transform-origin: right center;
+}
+
+@keyframes hint-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 0.18; }
 }
 
 
