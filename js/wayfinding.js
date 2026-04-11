@@ -20,7 +20,7 @@ const Wayfinding = (() => {
     manualPathAttachments: {
       'main-entrance': ['Path 1'],
       'lobby':         ['Path 2'],
-      'east-exit':     ['Path 2'],
+      'east-exit':     ['lobby'],
       'studio-a':      ['lobby'],
       'computer-lab':  ['lobby'],
       'room-13':       ['Path 3'],
