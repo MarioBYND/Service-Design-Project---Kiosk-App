@@ -820,7 +820,11 @@ Router.register('help', () => {
       <button class="btn-back" id="back-btn">‹</button>
       <span class="feat-title">Get Help</span>
     </header>
-    <div class="screen-body">
+    <div class="charge-map-section">
+      <p class="section-label" style="color:var(--purple)">Service Desk — Route from here</p>
+      <div class="map-wrap" id="help-map"></div>
+    </div>
+    <div class="charge-list-scroll">
       <div class="help-body">
 
         <div class="help-card">
@@ -829,7 +833,7 @@ Router.register('help', () => {
             <span class="help-row-icon">📍</span>
             <span class="help-row-text">
               <strong>Location</strong>
-              First Floor, near the main entrance. Look for the purple kiosk marker on the map below.
+              First Floor, near the main entrance. Look for the purple kiosk marker on the map.
             </span>
           </div>
           <div class="help-row">
@@ -881,9 +885,6 @@ Router.register('help', () => {
             </span>
           </div>
         </div>
-
-        <p class="help-map-label">Service Desk — Route from here</p>
-        <div class="wf-map-wrap" id="help-map"></div>
 
       </div>
     </div>
