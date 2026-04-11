@@ -115,8 +115,9 @@ Router.register('home', () => {
     onMarkerClick: room => {
       const STACK_FOR_ROOM = { 'room-8': 'E', 'room-9': 'D', 'room-10': 'C', 'room-11': 'B', 'room-12': 'A' };
       if (STACK_FOR_ROOM[room.id])         { Router.go('books',  { stack: STACK_FOR_ROOM[room.id] }); return; }
-      if (room.markerType === 'printer')   { Router.go('print');  return; }
-      if (room.markerType === 'charging')  { Router.go('charge'); return; }
+      if (room.markerType === 'printer')   { Router.go('print',  { printer: room.id }); return; }
+      if (room.id === 'room-6')            { Router.go('charge', { spotId: 1 });        return; }
+      if (room.id === 'room-7')            { Router.go('charge', { spotId: 2 });        return; }
       if (room.markerType === 'service')   { Router.go('help');   return; }
     }
   });
@@ -129,9 +130,10 @@ Router.register('home', () => {
 //  PRINTING HELP (sub-menu)
 // ════════════════════════════════════════════════════════════
 
-Router.register('print', () => {
+Router.register('print', ({ printer } = {}) => {
   const screen = document.createElement('div');
   screen.className = 'screen';
+  const printerRoom = printer === 'computer-lab' ? 'computer-lab' : 'studio-a';
 
   screen.innerHTML = `
     <header class="feat-header neutral">
@@ -162,7 +164,7 @@ Router.register('print', () => {
   });
 
   Wayfinding.initialize(screen.querySelector('#print-map'))
-    .then(() => Wayfinding.drawRoute('studio-a'));
+    .then(() => Wayfinding.drawRoute(printerRoom));
   screen.appendChild(makeBottomNav('home'));
   return screen;
 });
@@ -326,6 +328,15 @@ Router.register('print-docs', () => {
     kbVisible = !kbVisible;
     kbPanel.style.display = kbVisible ? 'block' : 'none';
     kbToggle.classList.toggle('active', kbVisible);
+  });
+
+  // Tapping the search bar itself opens the keyboard
+  input.addEventListener('click', () => {
+    if (!kbVisible) {
+      kbVisible = true;
+      kbPanel.style.display = 'block';
+      kbToggle.classList.add('active');
+    }
   });
 
   screen.appendChild(makeBottomNav('home'));
@@ -654,6 +665,15 @@ Router.register('books', ({ stack } = {}) => {
     kbToggle.classList.toggle('active', kbVisible);
   });
 
+  // Tapping the search bar itself opens the keyboard
+  input.addEventListener('click', () => {
+    if (!kbVisible) {
+      kbVisible = true;
+      kbPanel.style.display = 'block';
+      kbToggle.classList.add('active');
+    }
+  });
+
   input.addEventListener('input', e => { searchQuery = e.target.value; renderBooks(); });
 
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('home'));
@@ -721,12 +741,12 @@ Router.register('book-detail', ({ book }) => {
 //  CHARGING SPOTS
 // ════════════════════════════════════════════════════════════
 
-Router.register('charge', () => {
+Router.register('charge', ({ spotId } = {}) => {
   const screen = document.createElement('div');
   screen.className = 'screen';
 
   const spots = DATA.chargingSpots;
-  let selectedId = 1;
+  let selectedId = spotId || 1;
   let mapReady = false;
 
   screen.innerHTML = `
