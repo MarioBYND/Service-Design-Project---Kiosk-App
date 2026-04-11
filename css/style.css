@@ -805,6 +805,43 @@ html, body {
 .charge-desc { font-size: 11px; color: var(--text-2); line-height: 1.45; }
 .charge-seats { font-size: 10px; font-weight: 700; color: var(--lime-dk); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
 
+/* Inactive charging spot */
+.charge-item-inactive {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+.charge-badge-inactive {
+  background: var(--gray-2);
+  color: var(--gray-3);
+}
+
+.charge-unavailable {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gray-3);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.charge-item-body { flex: 1; min-width: 0; }
+
+/* Shelf tag shown in book list items */
+.book-stack-tag {
+  display: inline-block;
+  background: var(--teal);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  border-radius: 3px;
+  padding: 1px 5px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
 /* ════════════════════════════════════════════════════════════
    GET HELP
    ════════════════════════════════════════════════════════════ */

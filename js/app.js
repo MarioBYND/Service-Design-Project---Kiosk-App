@@ -111,7 +111,15 @@ Router.register('home', () => {
     btn.addEventListener('click', () => Router.go(btn.dataset.route));
   });
 
-  Wayfinding.initialize(screen.querySelector('#home-map'));
+  Wayfinding.initialize(screen.querySelector('#home-map'), {
+    onMarkerClick: room => {
+      const STACK_FOR_ROOM = { 'room-8': 'E', 'room-9': 'D', 'room-10': 'C', 'room-11': 'B', 'room-12': 'A' };
+      if (STACK_FOR_ROOM[room.id])         { Router.go('books',  { stack: STACK_FOR_ROOM[room.id] }); return; }
+      if (room.markerType === 'printer')   { Router.go('print');  return; }
+      if (room.markerType === 'charging')  { Router.go('charge'); return; }
+      if (room.markerType === 'service')   { Router.go('help');   return; }
+    }
+  });
   screen.appendChild(makeBottomNav('home'));
   return screen;
 });
@@ -542,15 +550,20 @@ Router.register('print-docs-success', ({ doc, printer }) => {
 //  FIND A BOOK
 // ════════════════════════════════════════════════════════════
 
-Router.register('books', () => {
+Router.register('books', ({ stack } = {}) => {
   const screen = document.createElement('div');
   screen.className = 'screen';
 
-  const GENRES = ['All', 'Fine Art', 'Photography', 'Design & Craft', 'Literature',
-                  'Graphic Novel', "Artist's Book", 'Exhibition Catalogue',
-                  'Social Sciences', 'Philosophy', 'Geography & Culture'];
+  const STACKS = [
+    { id: 'All', label: 'All Shelves' },
+    { id: 'A',   label: 'Shelf A — Fine Art' },
+    { id: 'B',   label: 'Shelf B — Photography & Catalogues' },
+    { id: 'C',   label: 'Shelf C — Design & Artist\'s Books' },
+    { id: 'D',   label: 'Shelf D — Literature & Comics' },
+    { id: 'E',   label: 'Shelf E — Social Sciences & More' },
+  ];
 
-  let activeGenre = 'All';
+  let activeStack = stack || 'All';
   let searchQuery = '';
   let kbVisible = false;
 
@@ -567,36 +580,44 @@ Router.register('books', () => {
         <button class="book-kb-toggle" id="kb-toggle" title="Toggle keyboard">⌨</button>
       </div>
     </div>
-    <div class="genre-chips" id="genre-chips">
-      ${GENRES.map(g => `<button class="genre-chip${g === 'All' ? ' active' : ''}" data-genre="${g}">${g}</button>`).join('')}
+    <div class="genre-chips" id="stack-chips">
+      ${STACKS.map(s => `<button class="genre-chip${s.id === activeStack ? ' active' : ''}" data-stack="${s.id}">${s.label}</button>`).join('')}
     </div>
     <div class="book-list-area" id="book-list-area"></div>
     <div class="book-keyboard-panel" id="kb-panel" style="display:none"></div>
   `;
 
-  const input = screen.querySelector('#search-input');
+  const input    = screen.querySelector('#search-input');
   const listArea = screen.querySelector('#book-list-area');
-  const kbPanel = screen.querySelector('#kb-panel');
+  const kbPanel  = screen.querySelector('#kb-panel');
   const kbToggle = screen.querySelector('#kb-toggle');
 
   function renderBooks() {
     const q = searchQuery.toLowerCase().trim();
     let books = DATA.books;
-    if (activeGenre !== 'All') books = books.filter(b => b.genre === activeGenre);
-    if (q) books = books.filter(b =>
-      b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)
-    );
+
+    // Stack filter only applies when NOT typing — typing searches all shelves
+    if (!q && activeStack !== 'All') {
+      books = books.filter(b => b.stack === activeStack);
+    }
+    if (q) {
+      books = DATA.books.filter(b =>
+        b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)
+      );
+    }
+
     if (!books.length) {
-      listArea.innerHTML = `<div class="no-results">No results${q ? ' for "<strong>' + q + '</strong>"' : ''}.<br>Try a different search or genre.</div>`;
+      listArea.innerHTML = `<div class="no-results">No results${q ? ' for "<strong>' + q + '</strong>"' : ''}.<br>Try a different search or shelf.</div>`;
       return;
     }
+
     listArea.innerHTML = books.map(b => `
       <div class="book-item" data-id="${b.id}">
         <div class="book-spine book-spine-${(b.genre||'').replace(/[^a-z]/gi,'').toLowerCase().slice(0,6)}"></div>
         <div class="book-meta">
           <div class="book-title">${b.title}</div>
           <div class="book-author">${b.author}${b.year ? ' · ' + b.year : ''}</div>
-          <div class="book-call">${b.callNumber}</div>
+          <div class="book-call">${b.callNumber} &nbsp;·&nbsp; <span class="book-stack-tag">Shelf ${b.stack}</span></div>
         </div>
         <div class="book-chevron">›</div>
       </div>
@@ -610,12 +631,14 @@ Router.register('books', () => {
     });
   }
 
-  // Genre chips
+  // Stack chips
   screen.querySelectorAll('.genre-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       screen.querySelectorAll('.genre-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      activeGenre = chip.dataset.genre;
+      activeStack = chip.dataset.stack;
+      searchQuery = '';
+      input.value = '';
       renderBooks();
     });
   });
@@ -649,7 +672,8 @@ Router.register('book-detail', ({ book }) => {
   const screen = document.createElement('div');
   screen.className = 'screen';
 
-  const mapFile = null; // using Mappedin
+  const STACK_ROOM = { A: 'room-12', B: 'room-11', C: 'room-10', D: 'room-9', E: 'room-8' };
+  const wayfindingRoom = STACK_ROOM[book.stack] || 'room-12';
   const floorLabel = book.floor === 1 ? 'First Floor' : 'Bottom Floor';
 
   screen.innerHTML = `
@@ -671,7 +695,7 @@ Router.register('book-detail', ({ book }) => {
         </div>
         <div class="detail-row">
           <span class="detail-label">Location</span>
-          <span class="detail-val">${book.shelf}</span>
+          <span class="detail-val">Shelf ${book.stack} — Level 1 Stacks</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">Floor</span>
@@ -687,7 +711,7 @@ Router.register('book-detail', ({ book }) => {
 
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('books'));
   Wayfinding.initialize(screen.querySelector('#book-map'))
-    .then(() => Wayfinding.drawRoute('room-12'));
+    .then(() => Wayfinding.drawRoute(wayfindingRoom));
   screen.appendChild(makeBottomNav('home'));
   return screen;
 });
@@ -702,6 +726,8 @@ Router.register('charge', () => {
   screen.className = 'screen';
 
   const spots = DATA.chargingSpots;
+  let selectedId = 1;
+  let mapReady = false;
 
   screen.innerHTML = `
     <header class="feat-header lime">
@@ -713,14 +739,18 @@ Router.register('charge', () => {
       <div class="map-wrap" id="charge-map"></div>
     </div>
     <div class="charge-list-scroll">
-      <div class="charge-list">
+      <div class="charge-list" id="charge-list">
         ${spots.map(s => `
-          <div class="charge-item" data-id="${s.id}">
-            <div class="charge-badge">${s.id}</div>
-            <div>
+          <div class="charge-item${s.active ? '' : ' charge-item-inactive'}${s.id === selectedId ? ' active' : ''}"
+               data-id="${s.id}">
+            <div class="charge-badge${s.active ? '' : ' charge-badge-inactive'}">${s.id}</div>
+            <div class="charge-item-body">
               <div class="charge-name">${s.name}</div>
               <div class="charge-desc">${s.description}</div>
-              <div class="charge-seats">${s.seats} charging ${s.seats === 1 ? 'spot' : 'spots'}</div>
+              ${s.active
+                ? `<div class="charge-seats">${s.seats} charging ${s.seats === 1 ? 'spot' : 'spots'}</div>`
+                : `<div class="charge-unavailable">Not currently available</div>`
+              }
             </div>
           </div>
         `).join('')}
@@ -729,8 +759,27 @@ Router.register('charge', () => {
   `;
 
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('home'));
+
   Wayfinding.initialize(screen.querySelector('#charge-map'))
-    .then(() => Wayfinding.drawRoute('room-6'));
+    .then(() => {
+      mapReady = true;
+      const initial = spots.find(s => s.id === selectedId);
+      if (initial && initial.wayfindingRoom) Wayfinding.drawRoute(initial.wayfindingRoom);
+    });
+
+  // Only active spots are tappable
+  screen.querySelectorAll('.charge-item:not(.charge-item-inactive)').forEach(el => {
+    el.addEventListener('click', () => {
+      const id  = parseInt(el.dataset.id);
+      const spot = spots.find(s => s.id === id);
+      if (!spot || !spot.active) return;
+      selectedId = id;
+      screen.querySelectorAll('.charge-item').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      if (mapReady && spot.wayfindingRoom) Wayfinding.drawRoute(spot.wayfindingRoom);
+    });
+  });
+
   screen.appendChild(makeBottomNav('home'));
   return screen;
 });

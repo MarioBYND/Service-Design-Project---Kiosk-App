@@ -63,6 +63,7 @@ const Wayfinding = (() => {
   let _routePath     = null;
   let _highlightedId = null;
   let _observer      = null;
+  let _onMarkerClick = null;
   // ── Calibration helper ────────────────────────────────────
   // Applies offsetX/Y and scaleX/Y from config.calibration to a rendered
   // pixel coordinate.  All drawn points (icons, route, pulse) pass through here.
@@ -82,13 +83,14 @@ const Wayfinding = (() => {
    * JSON config, then call drawRoute / clearRoute to control the overlay.
    * Returns a Promise that resolves when the config has loaded.
    */
-  function initialize(container) {
+  function initialize(container, opts) {
     // Teardown any previous instance
     if (_observer) { _observer.disconnect(); _observer = null; }
     _container     = container;
     _routePath     = null;
     _highlightedId = null;
     _config        = null;
+    _onMarkerClick = (opts && opts.onMarkerClick) || null;
 
     // Container must be a positioned block so the SVG overlay can sit on top
     _container.style.position = 'relative';
@@ -102,7 +104,7 @@ const Wayfinding = (() => {
 
     // SVG overlay — positioned over the image
     _svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    _svgEl.style.cssText = 'position:absolute;top:0;left:0;overflow:visible;pointer-events:none;';
+    _svgEl.style.cssText = 'position:absolute;top:0;left:0;overflow:visible;pointer-events:' + (_onMarkerClick ? 'all' : 'none') + ';';
     _container.appendChild(_svgEl);
 
     // Re-render whenever the container is resized (Raspberry Pi screen rotation, etc.)
@@ -231,7 +233,13 @@ const Wayfinding = (() => {
     routing.destinationRooms.forEach(room => {
       const { x: cx, y: cy } = _cal(_pctToPxX(room.xPct, rW), _pctToPxY(room.yPct, rH));
 
-      _svgEl.appendChild(_makeDestinationMarker(room, cx, cy, room.id === _highlightedId));
+      const marker = _makeDestinationMarker(room, cx, cy, room.id === _highlightedId);
+      if (_onMarkerClick) {
+        marker.setAttribute('pointer-events', 'all');
+        marker.style.cursor = 'pointer';
+        marker.addEventListener('click', () => _onMarkerClick(room));
+      }
+      _svgEl.appendChild(marker);
 
       if (!visibleLabels.has(room.id)) return;
 
