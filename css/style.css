@@ -1651,24 +1651,35 @@ html, body {
 
 .scroll-hint.hidden { opacity: 0; }
 
-/* Three static dots — static, barely visible */
+/* Single downward chevron — static, clearly directional */
 .scroll-hint-chevron {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  opacity: 0.28;
+  width: 20px;
+  height: 11px;
+  opacity: 0.45;
+  position: relative;
 }
 
 .scroll-hint-chevron::before,
-.scroll-hint-chevron::after,
-.scroll-hint-dot {
+.scroll-hint-chevron::after {
   content: '';
-  display: block;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
+  position: absolute;
+  bottom: 0;
+  width: 12px;
+  height: 2px;
   background: var(--gray-3);
+  border-radius: 2px;
+}
+
+.scroll-hint-chevron::before {
+  left: 0;
+  transform: rotate(35deg);
+  transform-origin: left center;
+}
+
+.scroll-hint-chevron::after {
+  right: 0;
+  transform: rotate(-35deg);
+  transform-origin: right center;
 }
 
 
