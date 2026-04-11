@@ -612,6 +612,7 @@ html, body {
 .book-search-field {
   display: flex;
   align-items: center;
+  cursor: pointer;
   background: var(--white);
   border: 2px solid var(--teal);
   border-radius: 10px;
@@ -1532,6 +1533,7 @@ html, body {
 .doc-search-field {
   display: flex;
   align-items: center;
+  cursor: pointer;
   background: var(--white);
   border: 2px solid var(--mag);
   border-radius: 10px;

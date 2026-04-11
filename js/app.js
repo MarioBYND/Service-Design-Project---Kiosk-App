@@ -330,8 +330,9 @@ Router.register('print-docs', () => {
     kbToggle.classList.toggle('active', kbVisible);
   });
 
-  // Tapping the search bar itself opens the keyboard
-  input.addEventListener('click', () => {
+  // Tapping anywhere in the search bar opens the keyboard
+  // (listener on the wrapper, not the readonly input — readonly blocks click on Chromium)
+  screen.querySelector('.doc-search-field').addEventListener('click', () => {
     if (!kbVisible) {
       kbVisible = true;
       kbPanel.style.display = 'block';
@@ -665,8 +666,9 @@ Router.register('books', ({ stack } = {}) => {
     kbToggle.classList.toggle('active', kbVisible);
   });
 
-  // Tapping the search bar itself opens the keyboard
-  input.addEventListener('click', () => {
+  // Tapping anywhere in the search bar opens the keyboard
+  // (listener on the wrapper, not the readonly input — readonly blocks click on Chromium)
+  screen.querySelector('.book-search-field').addEventListener('click', () => {
     if (!kbVisible) {
       kbVisible = true;
       kbPanel.style.display = 'block';
