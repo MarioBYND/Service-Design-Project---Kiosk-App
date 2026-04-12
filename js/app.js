@@ -64,6 +64,25 @@ function makeBottomNav(activeItem = 'home') {
 }
 
 
+// ── Touch scroll (RPi Chromium fix) ───────────────────────────
+// In Chromium kiosk with `user-select:none` on *, touch-action:pan-y
+// alone is unreliable. This manually drives scrollTop from touch events.
+function enableTouchScroll(el) {
+  if (!el) return;
+  let lastY = null;
+  el.addEventListener('touchstart', e => {
+    lastY = e.touches[0].clientY;
+  }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    if (lastY === null) return;
+    const y = e.touches[0].clientY;
+    el.scrollTop += lastY - y;
+    lastY = y;
+  }, { passive: true });
+  el.addEventListener('touchend',   () => { lastY = null; }, { passive: true });
+  el.addEventListener('touchcancel',() => { lastY = null; }, { passive: true });
+}
+
 // ── Scroll hint ───────────────────────────────────────────────
 // Shows a gradient fade + bouncing chevron at the bottom of `screen`
 // and hides it the moment the user scrolls `scrollEl`.
@@ -133,6 +152,7 @@ Router.register('home', () => {
       if (room.markerType === 'service')   { Router.go('help');   return; }
     }
   });
+  enableTouchScroll(screen.querySelector('.home-scroll'));
   screen.appendChild(makeBottomNav('home'));
   return screen;
 });
@@ -223,6 +243,7 @@ Router.register('print-guide', () => {
   `;
 
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('print'));
+  enableTouchScroll(screen.querySelector('.screen-body'));
   screen.appendChild(makeBottomNav('home'));
   return screen;
 });
@@ -352,6 +373,7 @@ Router.register('print-docs', () => {
     }
   });
 
+  enableTouchScroll(screen.querySelector('.doc-list-scroll'));
   screen.appendChild(makeBottomNav('home'));
   renderDocs();
   return screen;
@@ -463,6 +485,7 @@ Router.register('print-docs-settings', ({ doc }) => {
     Router.go('print-docs-confirm', { doc, printer: selectedPrinter, colour, size, copies, total });
   });
 
+  enableTouchScroll(screen.querySelector('.wizard-body-scroll'));
   screen.appendChild(makeBottomNav('home'));
   return screen;
 });
@@ -530,6 +553,7 @@ Router.register('print-docs-confirm', ({ doc, printer, colour, size, copies, tot
     Router.go('print-docs-success', { doc, printer });
   });
 
+  enableTouchScroll(screen.querySelector('.wizard-body-scroll'));
   screen.appendChild(makeBottomNav('home'));
   return screen;
 });
@@ -691,6 +715,7 @@ Router.register('books', ({ stack } = {}) => {
   input.addEventListener('input', e => { searchQuery = e.target.value; renderBooks(); });
 
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('home'));
+  enableTouchScroll(screen.querySelector('.book-list-area'));
   screen.appendChild(makeBottomNav('home'));
 
   renderBooks();
@@ -744,6 +769,7 @@ Router.register('book-detail', ({ book }) => {
   `;
 
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('books'));
+  enableTouchScroll(screen.querySelector('.screen-body'));
   Wayfinding.initialize(screen.querySelector('#book-map'))
     .then(() => Wayfinding.drawRoute(wayfindingRoom));
   screen.appendChild(makeBottomNav('home'));
@@ -814,6 +840,7 @@ Router.register('charge', ({ spotId } = {}) => {
     });
   });
 
+  enableTouchScroll(screen.querySelector('.charge-list-scroll'));
   addScrollHint(screen, screen.querySelector('.charge-list-scroll'), 'scroll-hint--lime');
   screen.appendChild(makeBottomNav('home'));
   return screen;
@@ -906,6 +933,7 @@ Router.register('help', () => {
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('home'));
   Wayfinding.initialize(screen.querySelector('#help-map'))
     .then(() => Wayfinding.drawRoute('east-exit'));
+  enableTouchScroll(screen.querySelector('.charge-list-scroll'));
   addScrollHint(screen, screen.querySelector('.charge-list-scroll'), 'scroll-hint--purple');
   screen.appendChild(makeBottomNav('help'));
   return screen;
