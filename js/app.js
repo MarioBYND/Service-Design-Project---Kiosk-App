@@ -3,6 +3,46 @@
 //  All screens · Inter design system · ECUAD brand colours
 // ════════════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════════════
+//  RFID — card → user mapping + sign-in state
+// ════════════════════════════════════════════════════════════
+
+const RFID_USERS = {
+  '08007828B7': { name: 'Demo User One',  id: 'S001' },
+  '08006F1759': { name: 'Demo User Two',  id: 'S002' },
+};
+
+let currentUser = null;   // null = not signed in
+
+document.addEventListener('rfid-scan', (e) => {
+  const cardId = e.detail.cardId;
+  const user   = RFID_USERS[cardId];
+  if (user) {
+    currentUser = user;
+    console.log('[RFID] Signed in:', user.name);
+    // Show a brief toast then stay on the current screen
+    showRfidToast(user.name);
+  } else {
+    console.log('[RFID] Unknown card:', cardId);
+  }
+});
+
+function showRfidToast(name) {
+  const existing = document.getElementById('rfid-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'rfid-toast';
+  toast.className = 'rfid-toast';
+  toast.textContent = '✓ Signed in as ' + name;
+  document.getElementById('app').appendChild(toast);
+
+  // Fade out after 2.5 s
+  setTimeout(() => toast.classList.add('rfid-toast--hide'), 2500);
+  setTimeout(() => toast.remove(), 3200);
+}
+
+
 // ── Idle timer ────────────────────────────────────────────────
 let idleTimer = null;
 const IDLE_MS = 60000;
@@ -953,17 +993,38 @@ Router.register('profile', () => {
   const screen = document.createElement('div');
   screen.className = 'screen';
 
-  screen.innerHTML = `
-    <header class="feat-header purple">
-      <button class="btn-back" id="back-btn">‹</button>
-      <span class="feat-title">Profile</span>
-    </header>
-    <div class="maint-body">
-      <div class="maint-icon">👤</div>
-      <h1 class="maint-title">Coming Soon</h1>
-      <p class="maint-text">Student profile and account features will be available here.</p>
-    </div>
-  `;
+  if (currentUser) {
+    screen.innerHTML = `
+      <header class="feat-header purple">
+        <button class="btn-back" id="back-btn">‹</button>
+        <span class="feat-title">Profile</span>
+      </header>
+      <div class="profile-body">
+        <div class="profile-avatar">👤</div>
+        <div class="profile-name">${currentUser.name}</div>
+        <div class="profile-id">Student ID: ${currentUser.id}</div>
+        <div class="profile-status signed-in">● Signed in</div>
+        <button class="profile-signout-btn" id="signout-btn">Sign Out</button>
+      </div>
+    `;
+    screen.querySelector('#signout-btn').addEventListener('click', () => {
+      currentUser = null;
+      Router.go('profile');
+    });
+  } else {
+    screen.innerHTML = `
+      <header class="feat-header purple">
+        <button class="btn-back" id="back-btn">‹</button>
+        <span class="feat-title">Profile</span>
+      </header>
+      <div class="profile-body">
+        <div class="profile-avatar">👤</div>
+        <div class="profile-name">Not signed in</div>
+        <div class="profile-hint">Scan your library card<br>to sign in</div>
+        <div class="profile-status signed-out">○ No card detected</div>
+      </div>
+    `;
+  }
 
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('home'));
   screen.appendChild(makeBottomNav('profile'));

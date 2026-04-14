@@ -1677,6 +1677,78 @@ html, body {
 }
 
 
+/* ── RFID toast notification ─────────────────────────────── */
+.rfid-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--black);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 40px;
+  z-index: 9999;
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+.rfid-toast--hide { opacity: 0; }
+
+/* ── Profile screen ──────────────────────────────────────── */
+.profile-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 24px;
+}
+.profile-avatar {
+  font-size: 56px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.profile-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--black);
+  text-align: center;
+}
+.profile-id {
+  font-size: 15px;
+  color: var(--gray-3);
+}
+.profile-hint {
+  font-size: 16px;
+  color: var(--gray-3);
+  text-align: center;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.profile-status {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.profile-status.signed-in  { color: #2a9d2a; }
+.profile-status.signed-out { color: var(--gray-3); }
+.profile-signout-btn {
+  margin-top: 20px;
+  padding: 14px 36px;
+  background: var(--purple);
+  color: #fff;
+  border: none;
+  border-radius: 40px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+}
+
 /* ── Wayfinding map container ─────────────────────────────── */
 /* Used on help screen (and any future screen that shows the
    indoor SVG wayfinding overlay instead of the Mappedin iframe) */
