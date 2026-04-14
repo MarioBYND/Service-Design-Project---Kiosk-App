@@ -38,13 +38,42 @@ document.addEventListener('mousedown', resetIdleTimer);
 
 // Keep the latest RFID card in memory so routes can prefill from scans.
 let lastScannedCardId = '';
+let currentUser = null;
+
+const DEMO_USERS_BY_CARD = {
+  '08007828B7': { id: 'u-001', name: 'Demo User One', program: 'Communication Design' },
+  '08006F1759': { id: 'u-002', name: 'Demo User Two', program: 'Industrial Design' },
+};
+
+function normalizeCardId(value) {
+  return String(value || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+}
+
+function resolveUserFromCard(cardId) {
+  const normalized = normalizeCardId(cardId);
+  if (!normalized) return null;
+
+  if (DEMO_USERS_BY_CARD[normalized]) {
+    return { ...DEMO_USERS_BY_CARD[normalized], cardId: normalized };
+  }
+
+  return {
+    id: 'guest-' + normalized.slice(-4),
+    name: 'Guest ' + normalized.slice(-4),
+    program: 'Library User',
+    cardId: normalized,
+  };
+}
 
 window.addEventListener('rfid:scan', e => {
-  const cardId = (e && e.detail && e.detail.id ? String(e.detail.id) : '').trim();
+  const cardId = normalizeCardId(e && e.detail && e.detail.id ? String(e.detail.id) : '');
   if (!cardId) return;
 
   lastScannedCardId = cardId;
-  Router.go('print-docs', { cardId, source: 'rfid' });
+  currentUser = resolveUserFromCard(cardId);
+
+  const activeRoute = Router.current() || 'home';
+  Router.go(activeRoute);
 });
 
 
@@ -56,7 +85,7 @@ function makeBottomNav(activeItem = 'home') {
 
   const items = [
     { id: 'home',    icon: '⌂',  label: 'Home',    route: 'home'    },
-    { id: 'profile', icon: '◉',  label: 'Profile', route: 'profile' },
+    { id: 'profile', icon: '◉',  label: currentUser ? 'Signed In' : 'Profile', route: 'profile' },
     { id: 'help',    icon: '?',  label: 'Get Help', route: 'help'   },
   ];
 
@@ -117,7 +146,7 @@ Router.register('home', () => {
   screen.innerHTML = `
     <div class="home-header">
       <span class="home-logo">ECUAD Library</span>
-      <span class="home-sub">Self-Service Kiosk</span>
+      <span class="home-sub">${currentUser ? 'Signed in: ' + currentUser.name : 'Self-Service Kiosk'}</span>
     </div>
     <div class="home-scroll">
       <div class="home-grid">
@@ -970,19 +999,40 @@ Router.register('profile', () => {
   const screen = document.createElement('div');
   screen.className = 'screen';
 
+  const signedInMarkup = currentUser
+    ? `
+      <div class="maint-body">
+        <div class="maint-icon">👤</div>
+        <h1 class="maint-title">${currentUser.name}</h1>
+        <p class="maint-text">Card ID: ${currentUser.cardId}</p>
+        <p class="maint-text">Program: ${currentUser.program}</p>
+        <button class="btn-next-step" id="signout-btn" style="max-width:320px;margin:16px auto 0;">Sign Out</button>
+      </div>
+    `
+    : `
+      <div class="maint-body">
+        <div class="maint-icon">👤</div>
+        <h1 class="maint-title">Not Signed In</h1>
+        <p class="maint-text">Scan your card at the kiosk reader to sign in.</p>
+      </div>
+    `;
+
   screen.innerHTML = `
     <header class="feat-header purple">
       <button class="btn-back" id="back-btn">‹</button>
       <span class="feat-title">Profile</span>
     </header>
-    <div class="maint-body">
-      <div class="maint-icon">👤</div>
-      <h1 class="maint-title">Coming Soon</h1>
-      <p class="maint-text">Student profile and account features will be available here.</p>
-    </div>
+    ${signedInMarkup}
   `;
 
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('home'));
+  const signoutBtn = screen.querySelector('#signout-btn');
+  if (signoutBtn) {
+    signoutBtn.addEventListener('click', () => {
+      currentUser = null;
+      Router.go('home');
+    });
+  }
   screen.appendChild(makeBottomNav('profile'));
   return screen;
 });
