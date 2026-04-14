@@ -1,160 +1,224 @@
 #!/usr/bin/env python3
 """
-RFID WebSocket Bridge — ECUAD Library Kiosk
-============================================
-Reads card IDs from a Parallax serial RFID reader on /dev/serial0 (2400 baud)
-and broadcasts each scanned card ID via WebSocket on ws://localhost:8765.
+Local RFID bridge for Raspberry Pi kiosk.
 
-Serial frame format (Parallax reader):
-  0x0A  +  10 ASCII hex chars  +  0x0D   =  12 bytes per scan
+- Reads Parallax serial RFID data from /dev/serial0 (2400 baud by default)
+- Publishes scans over Server-Sent Events (SSE) on localhost
+- Provides /health and /last-scan endpoints for diagnostics
 
-Logs go to: /tmp/rfid_bridge.log
-PID file:   /tmp/rfid_bridge.pid
+Run:
+  python3 rfid_bridge.py
 """
 
-import asyncio
-import logging
-import os
+import json
+import queue
+import re
 import signal
-import sys
+import threading
+import time
+from datetime import datetime, timezone
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-LOG_FILE  = '/tmp/rfid_bridge.log'
-PID_FILE  = '/tmp/rfid_bridge.pid'
-SERIAL_PORT = '/dev/serial0'
-BAUD_RATE   = 2400
-WS_PORT     = 8765
+try:
+    import serial  # pyserial
+except ImportError as exc:  # pragma: no cover
+    raise SystemExit(
+        "Missing dependency: pyserial. Install with: sudo apt install python3-serial"
+    ) from exc
 
-# ── Logging ───────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s  %(levelname)-7s  %(message)s',
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler(sys.stdout),
-    ]
-)
-log = logging.getLogger('rfid_bridge')
 
-# ── WebSocket client registry ─────────────────────────────────
-CLIENTS = set()
+SERIAL_DEVICE = "/dev/serial0"
+BAUD_RATE = 2400
+HOST = "127.0.0.1"
+PORT = 8765
 
-async def ws_handler(websocket, path=''):
-    """Accept a new WebSocket client and track it."""
-    CLIENTS.add(websocket)
-    log.info(f'WS client connected  (total: {len(CLIENTS)})')
-    try:
-        await websocket.wait_closed()
-    except Exception:
-        pass
-    finally:
-        CLIENTS.discard(websocket)
-        log.info(f'WS client disconnected  (total: {len(CLIENTS)})')
 
-async def broadcast(card_id: str):
-    """Send card_id to every connected WebSocket client."""
-    if not CLIENTS:
-        log.info(f'Scan {card_id} — no WS clients connected')
-        return
-    dead = set()
-    for ws in list(CLIENTS):
+class BridgeState:
+    def __init__(self):
+        self.last_scan = None
+        self.listeners = []
+        self.lock = threading.Lock()
+
+    def add_listener(self):
+        q = queue.Queue(maxsize=10)
+        with self.lock:
+            self.listeners.append(q)
+        return q
+
+    def remove_listener(self, q):
+        with self.lock:
+            if q in self.listeners:
+                self.listeners.remove(q)
+
+    def publish_scan(self, payload):
+        with self.lock:
+            self.last_scan = payload
+            listeners = list(self.listeners)
+
+        for q in listeners:
+            try:
+                q.put_nowait(payload)
+            except queue.Full:
+                # Drop oldest queued message and enqueue latest scan.
+                try:
+                    _ = q.get_nowait()
+                    q.put_nowait(payload)
+                except queue.Empty:
+                    pass
+
+
+STATE = BridgeState()
+STOP_EVENT = threading.Event()
+
+
+def iso_now():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def sanitize_card(raw_line):
+    # Keep only visible ID characters. Parallax readers often append CR/LF and framing chars.
+    card = re.sub(r"[^0-9A-Za-z]", "", raw_line or "").upper()
+    if len(card) < 4:
+        return None
+    return card
+
+
+def serial_reader_loop(device, baud):
+    backoff_seconds = 2
+
+    while not STOP_EVENT.is_set():
         try:
-            await ws.send(card_id)
-        except Exception:
-            dead.add(ws)
-    CLIENTS -= dead
-    log.info(f'Broadcast {card_id!r} to {len(CLIENTS) + len(dead)} client(s)  ({len(dead)} dead removed)')
+            with serial.Serial(device, baudrate=baud, timeout=1) as ser:
+                print(f"[rfid-bridge] Listening on {device} @ {baud} baud")
+                while not STOP_EVENT.is_set():
+                    raw = ser.readline().decode("ascii", errors="ignore").strip()
+                    if not raw:
+                        continue
 
-# ── Serial reader ─────────────────────────────────────────────
-async def serial_reader():
-    """
-    Continuously read the serial port and extract card IDs.
-    Runs forever; errors sleep 1 s then retry.
-    """
-    import serial  # imported here so startup errors are logged cleanly
+                    card_id = sanitize_card(raw)
+                    if not card_id:
+                        continue
 
-    log.info(f'Opening {SERIAL_PORT} at {BAUD_RATE} baud …')
-    try:
-        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-        log.info('Serial port open — waiting for card scans')
-    except Exception as e:
-        log.error(f'Cannot open serial port: {e}')
-        log.error('RFID scanning disabled — WebSocket bridge still running')
-        # Keep the bridge alive so the app doesn't spam reconnect errors
-        await asyncio.Future()
-        return
+                    payload = {
+                        "id": card_id,
+                        "raw": raw,
+                        "timestamp": iso_now(),
+                    }
+                    print(f"[rfid-bridge] scan: {card_id}")
+                    STATE.publish_scan(payload)
+        except Exception as err:
+            print(f"[rfid-bridge] serial error: {err}")
+            STOP_EVENT.wait(backoff_seconds)
 
-    buf  = bytearray()
-    loop = asyncio.get_event_loop()
 
-    while True:
+class RequestHandler(BaseHTTPRequestHandler):
+    server_version = "RFIDBridge/1.0"
+
+    def _send_cors_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def do_OPTIONS(self):
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self._send_cors_headers()
+        self.end_headers()
+
+    def do_GET(self):
+        if self.path == "/health":
+            body = {
+                "ok": True,
+                "service": "rfid-bridge",
+                "serial_device": SERIAL_DEVICE,
+                "baud": BAUD_RATE,
+                "last_scan": STATE.last_scan,
+            }
+            self._send_json(body)
+            return
+
+        if self.path == "/last-scan":
+            self._send_json({"last_scan": STATE.last_scan})
+            return
+
+        if self.path == "/events":
+            self._stream_events()
+            return
+
+        self.send_response(HTTPStatus.NOT_FOUND)
+        self._send_cors_headers()
+        self.end_headers()
+
+    def _send_json(self, body):
+        payload = json.dumps(body).encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self._send_cors_headers()
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def _stream_events(self):
+        listener_q = STATE.add_listener()
+
+        self.send_response(HTTPStatus.OK)
+        self._send_cors_headers()
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+
+        # Send initial connection event.
+        self.wfile.write(b"event: ready\n")
+        self.wfile.write(f"data: {json.dumps({'timestamp': iso_now()})}\n\n".encode("utf-8"))
+        self.wfile.flush()
+
         try:
-            # Non-blocking read via thread executor so the event loop stays live
-            chunk = await loop.run_in_executor(None, lambda: ser.read(32))
-            if not chunk:
-                continue
-
-            buf.extend(chunk)
-
-            # Parse all complete 12-byte frames: 0x0A + 10 hex chars + 0x0D
-            while True:
-                start = buf.find(0x0A)
-                if start == -1:
-                    buf.clear()
-                    break
-                if len(buf) - start < 12:
-                    # Incomplete frame — keep buf and wait for more bytes
-                    buf = buf[start:]
-                    break
-                if buf[start + 11] == 0x0D:
-                    raw     = buf[start + 1 : start + 11]
-                    card_id = raw.decode('ascii', errors='ignore').strip().upper()
-                    if len(card_id) == 10:
-                        await broadcast(card_id)
-                    else:
-                        log.warning(f'Unexpected card length {len(card_id)!r}: {raw!r}')
-                    buf = buf[start + 12:]
-                else:
-                    # Misaligned — skip this 0x0A and keep scanning
-                    buf = buf[start + 1:]
-
-        except Exception as e:
-            log.error(f'Serial read error: {e}')
-            await asyncio.sleep(1)
-
-# ── Entry point ───────────────────────────────────────────────
-async def main():
-    import websockets
-
-    log.info(f'Starting WebSocket server on ws://localhost:{WS_PORT}')
-    try:
-        async with websockets.serve(ws_handler, 'localhost', WS_PORT):
-            log.info('WebSocket server ready')
-            await serial_reader()
-    except OSError as e:
-        log.error(f'Cannot bind port {WS_PORT}: {e}')
-        log.error('Is another rfid_bridge.py still running? Check: ps aux | grep rfid')
-        sys.exit(1)
-
-if __name__ == '__main__':
-    # ── PID file (prevent double-start confusion) ─────────────
-    with open(PID_FILE, 'w') as fh:
-        fh.write(str(os.getpid()))
-
-    def _cleanup(signum=None, frame=None):
-        log.info(f'Signal {signum} — shutting down')
-        try:
-            os.unlink(PID_FILE)
-        except FileNotFoundError:
+            while not STOP_EVENT.is_set():
+                try:
+                    payload = listener_q.get(timeout=15)
+                    self.wfile.write(b"event: scan\n")
+                    self.wfile.write(f"data: {json.dumps(payload)}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+                except queue.Empty:
+                    # Keepalive comment to prevent some clients/proxies from closing idle stream.
+                    self.wfile.write(b": keepalive\n\n")
+                    self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
             pass
-        sys.exit(0)
+        finally:
+            STATE.remove_listener(listener_q)
 
-    signal.signal(signal.SIGTERM, _cleanup)
-    signal.signal(signal.SIGINT,  _cleanup)
+    def log_message(self, format_str, *args):
+        # Quieter logs for kiosk runtime.
+        return
 
-    log.info(f'=== RFID bridge starting (PID {os.getpid()}) ===')
+
+def main():
+    reader_thread = threading.Thread(
+        target=serial_reader_loop,
+        args=(SERIAL_DEVICE, BAUD_RATE),
+        daemon=True,
+    )
+    reader_thread.start()
+
+    httpd = ThreadingHTTPServer((HOST, PORT), RequestHandler)
+    print(f"[rfid-bridge] HTTP server running at http://{HOST}:{PORT}")
+
+    def _shutdown(*_):
+        STOP_EVENT.set()
+        httpd.shutdown()
+
+    signal.signal(signal.SIGINT, _shutdown)
+    signal.signal(signal.SIGTERM, _shutdown)
 
     try:
-        asyncio.run(main())
-    except Exception as e:
-        log.error(f'Fatal: {e}')
-        sys.exit(1)
+        httpd.serve_forever(poll_interval=0.5)
+    finally:
+        STOP_EVENT.set()
+        reader_thread.join(timeout=2)
+        httpd.server_close()
+
+
+if __name__ == "__main__":
+    main()

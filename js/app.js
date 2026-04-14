@@ -76,6 +76,77 @@ document.addEventListener('touchstart', () => {
 
 document.addEventListener('mousedown', resetIdleTimer);
 
+// Keep the latest RFID card in memory so routes can prefill from scans.
+let lastScannedCardId = '';
+let currentUser = null;
+
+const DEMO_USERS_BY_CARD = {
+  '08007828B7': { id: 'u-001', name: 'Demo User One', program: 'Communication Design' },
+  '08006F1759': { id: 'u-002', name: 'Demo User Two', program: 'Industrial Design' },
+};
+
+function normalizeCardId(value) {
+  return String(value || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+}
+
+function resolveUserFromCard(cardId) {
+  const normalized = normalizeCardId(cardId);
+  if (!normalized) return null;
+
+  if (DEMO_USERS_BY_CARD[normalized]) {
+    return { ...DEMO_USERS_BY_CARD[normalized], cardId: normalized };
+  }
+
+  return {
+    id: 'guest-' + normalized.slice(-4),
+    name: 'Guest ' + normalized.slice(-4),
+    program: 'Library User',
+    cardId: normalized,
+  };
+}
+
+function showScanToast(message) {
+  const existing = document.getElementById('rfid-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'rfid-toast';
+  toast.textContent = message;
+  toast.style.cssText = [
+    'position:fixed',
+    'top:14px',
+    'right:14px',
+    'z-index:9999',
+    'background:#111827',
+    'color:#fff',
+    'padding:10px 14px',
+    'border-radius:10px',
+    'font:600 14px/1.2 Inter,system-ui,sans-serif',
+    'box-shadow:0 8px 20px rgba(0,0,0,0.25)',
+  ].join(';');
+
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.remove(); }, 2200);
+}
+
+window.addEventListener('rfid:scan', e => {
+  const cardId = normalizeCardId(e && e.detail && e.detail.id ? String(e.detail.id) : '');
+  if (!cardId) return;
+
+  lastScannedCardId = cardId;
+  currentUser = resolveUserFromCard(cardId);
+  showScanToast('Signed in: ' + currentUser.name);
+
+  const homeSub = document.querySelector('.home-sub');
+  if (homeSub) homeSub.textContent = 'Signed in: ' + currentUser.name;
+
+  // Avoid force re-rendering the current screen on every scan,
+  // which can feel glitchy during touch interactions.
+  if (Router.current() === 'profile') {
+    Router.go('profile');
+  }
+});
+
 
 // ── Bottom nav builder ────────────────────────────────────────
 // activeItem: 'home' | 'profile' | 'help' — highlights the active tab
@@ -85,7 +156,7 @@ function makeBottomNav(activeItem = 'home') {
 
   const items = [
     { id: 'home',    icon: '⌂',  label: 'Home',    route: 'home'    },
-    { id: 'profile', icon: '◉',  label: 'Profile', route: 'profile' },
+    { id: 'profile', icon: '◉',  label: currentUser ? 'Signed In' : 'Profile', route: 'profile' },
     { id: 'help',    icon: '?',  label: 'Get Help', route: 'help'   },
   ];
 
@@ -146,7 +217,7 @@ Router.register('home', () => {
   screen.innerHTML = `
     <div class="home-header">
       <span class="home-logo">ECUAD Library</span>
-      <span class="home-sub">Self-Service Kiosk</span>
+      <span class="home-sub">${currentUser ? 'Signed in: ' + currentUser.name : 'Self-Service Kiosk'}</span>
     </div>
     <div class="home-scroll">
       <div class="home-grid">
@@ -295,18 +366,18 @@ Router.register('print-guide', () => {
 
 // All queued documents — shown by default, filtered by search
 const MOCK_DOCS = [
-  { id: 1,  name: 'Final_Thesis_Draft.pdf',          pages: 24, size: '3.2 MB', sent: '8:41 AM', ext: 'pdf' },
-  { id: 2,  name: 'Studio_Presentation_Final.pdf',   pages: 12, size: '1.8 MB', sent: '8:39 AM', ext: 'pdf' },
-  { id: 3,  name: 'Exhibition_Poster_A3.pdf',        pages: 1,  size: '4.5 MB', sent: '9:02 AM', ext: 'pdf' },
-  { id: 4,  name: 'Artist_Statement_v2.docx',        pages: 2,  size: '0.3 MB', sent: '9:00 AM', ext: 'doc' },
-  { id: 5,  name: 'Reading_Response_Week8.pdf',      pages: 3,  size: '0.6 MB', sent: '7:55 AM', ext: 'pdf' },
-  { id: 6,  name: 'Capstone_Project_Brief.pdf',      pages: 8,  size: '1.1 MB', sent: '9:15 AM', ext: 'pdf' },
-  { id: 7,  name: 'Colour_Theory_Assignment.pdf',    pages: 5,  size: '2.4 MB', sent: '9:18 AM', ext: 'pdf' },
-  { id: 8,  name: 'Typography_Specimen_Sheet.pdf',   pages: 2,  size: '0.9 MB', sent: '9:22 AM', ext: 'pdf' },
-  { id: 9,  name: 'Process_Journal_Oct.docx',        pages: 14, size: '0.5 MB', sent: '9:30 AM', ext: 'doc' },
-  { id: 10, name: 'Wayfinding_System_Proposal.pdf',  pages: 6,  size: '3.7 MB', sent: '9:33 AM', ext: 'pdf' },
-  { id: 11, name: 'Photo_Series_Contact_Sheet.pdf',  pages: 4,  size: '5.2 MB', sent: '9:40 AM', ext: 'pdf' },
-  { id: 12, name: 'Service_Design_Report.pdf',       pages: 18, size: '2.0 MB', sent: '9:44 AM', ext: 'pdf' },
+  { id: 1,  ownerId: '9047000011', name: 'Final_Thesis_Draft.pdf',          pages: 24, size: '3.2 MB', sent: '8:41 AM', ext: 'pdf' },
+  { id: 2,  ownerId: '9047000011', name: 'Studio_Presentation_Final.pdf',   pages: 12, size: '1.8 MB', sent: '8:39 AM', ext: 'pdf' },
+  { id: 3,  ownerId: '9047000199', name: 'Exhibition_Poster_A3.pdf',        pages: 1,  size: '4.5 MB', sent: '9:02 AM', ext: 'pdf' },
+  { id: 4,  ownerId: '9047000199', name: 'Artist_Statement_v2.docx',        pages: 2,  size: '0.3 MB', sent: '9:00 AM', ext: 'doc' },
+  { id: 5,  ownerId: '9047000420', name: 'Reading_Response_Week8.pdf',      pages: 3,  size: '0.6 MB', sent: '7:55 AM', ext: 'pdf' },
+  { id: 6,  ownerId: '9047000420', name: 'Capstone_Project_Brief.pdf',      pages: 8,  size: '1.1 MB', sent: '9:15 AM', ext: 'pdf' },
+  { id: 7,  ownerId: '9047001234', name: 'Colour_Theory_Assignment.pdf',    pages: 5,  size: '2.4 MB', sent: '9:18 AM', ext: 'pdf' },
+  { id: 8,  ownerId: '9047001234', name: 'Typography_Specimen_Sheet.pdf',   pages: 2,  size: '0.9 MB', sent: '9:22 AM', ext: 'pdf' },
+  { id: 9,  ownerId: '9047008899', name: 'Process_Journal_Oct.docx',        pages: 14, size: '0.5 MB', sent: '9:30 AM', ext: 'doc' },
+  { id: 10, ownerId: '9047008899', name: 'Wayfinding_System_Proposal.pdf',  pages: 6,  size: '3.7 MB', sent: '9:33 AM', ext: 'pdf' },
+  { id: 11, ownerId: '9047007777', name: 'Photo_Series_Contact_Sheet.pdf',  pages: 4,  size: '5.2 MB', sent: '9:40 AM', ext: 'pdf' },
+  { id: 12, ownerId: '9047007777', name: 'Service_Design_Report.pdf',       pages: 18, size: '2.0 MB', sent: '9:44 AM', ext: 'pdf' },
 ];
 
 function makeWizardSteps(activeStep) {
@@ -324,11 +395,11 @@ function makeWizardSteps(activeStep) {
   `;
 }
 
-Router.register('print-docs', () => {
+Router.register('print-docs', ({ cardId, source } = {}) => {
   const screen = document.createElement('div');
   screen.className = 'screen';
 
-  let searchQuery = '';
+  let searchQuery = (cardId || lastScannedCardId || '').trim();
   let kbVisible = false;
 
   const EXT_ICON = { pdf: '📄', doc: '📝' };
@@ -344,10 +415,11 @@ Router.register('print-docs', () => {
         <div class="doc-search-field">
           <span class="doc-search-icon">🔍</span>
           <input class="doc-search-input" id="doc-search-input" type="text"
-            placeholder="Search by file name…" readonly />
+            placeholder="Search by file name or card ID..." readonly />
           <button class="doc-kb-toggle" id="doc-kb-toggle">⌨</button>
         </div>
       </div>
+      ${source === 'rfid' && searchQuery ? `<p class="doc-list-label">Card scanned: <strong>${searchQuery}</strong></p>` : ''}
       <p class="doc-list-label">Queued documents — tap one to select</p>
       <div class="doc-list-scroll" id="doc-list-area"></div>
       <div class="doc-keyboard-panel" id="doc-kb-panel" style="display:none"></div>
@@ -364,7 +436,10 @@ Router.register('print-docs', () => {
   function renderDocs() {
     const q = searchQuery.toLowerCase().trim();
     const filtered = q
-      ? MOCK_DOCS.filter(d => d.name.toLowerCase().includes(q))
+      ? MOCK_DOCS.filter(d =>
+          d.name.toLowerCase().includes(q) ||
+          String(d.ownerId || '').toLowerCase().includes(q)
+        )
       : MOCK_DOCS;
 
     if (!filtered.length) {
@@ -377,7 +452,7 @@ Router.register('print-docs', () => {
         <div class="doc-icon">${EXT_ICON[d.ext] || '📄'}</div>
         <div class="doc-info">
           <div class="doc-name">${d.name}</div>
-          <div class="doc-meta">${d.pages} page${d.pages !== 1 ? 's' : ''} · ${d.size} · Sent ${d.sent}</div>
+          <div class="doc-meta">Card ${d.ownerId} · ${d.pages} page${d.pages !== 1 ? 's' : ''} · ${d.size} · Sent ${d.sent}</div>
         </div>
         <div class="doc-select-indicator">›</div>
       </div>
@@ -396,6 +471,8 @@ Router.register('print-docs', () => {
   const kb = Keyboard.create(q => { searchQuery = q; input.value = q; renderDocs(); });
   kb.bindInput(input);
   kbPanel.appendChild(kb.el);
+
+  if (searchQuery) input.value = searchQuery;
 
   kbToggle.addEventListener('click', () => {
     kbVisible = !kbVisible;
@@ -993,40 +1070,40 @@ Router.register('profile', () => {
   const screen = document.createElement('div');
   screen.className = 'screen';
 
-  if (currentUser) {
-    screen.innerHTML = `
-      <header class="feat-header purple">
-        <button class="btn-back" id="back-btn">‹</button>
-        <span class="feat-title">Profile</span>
-      </header>
-      <div class="profile-body">
-        <div class="profile-avatar">👤</div>
-        <div class="profile-name">${currentUser.name}</div>
-        <div class="profile-id">Student ID: ${currentUser.id}</div>
-        <div class="profile-status signed-in">● Signed in</div>
-        <button class="profile-signout-btn" id="signout-btn">Sign Out</button>
+  const signedInMarkup = currentUser
+    ? `
+      <div class="maint-body">
+        <div class="maint-icon">👤</div>
+        <h1 class="maint-title">${currentUser.name}</h1>
+        <p class="maint-text">Card ID: ${currentUser.cardId}</p>
+        <p class="maint-text">Program: ${currentUser.program}</p>
+        <button class="btn-next-step" id="signout-btn" style="max-width:320px;margin:16px auto 0;">Sign Out</button>
+      </div>
+    `
+    : `
+      <div class="maint-body">
+        <div class="maint-icon">👤</div>
+        <h1 class="maint-title">Not Signed In</h1>
+        <p class="maint-text">Scan your card at the kiosk reader to sign in.</p>
       </div>
     `;
-    screen.querySelector('#signout-btn').addEventListener('click', () => {
-      currentUser = null;
-      Router.go('profile');
-    });
-  } else {
-    screen.innerHTML = `
-      <header class="feat-header purple">
-        <button class="btn-back" id="back-btn">‹</button>
-        <span class="feat-title">Profile</span>
-      </header>
-      <div class="profile-body">
-        <div class="profile-avatar">👤</div>
-        <div class="profile-name">Not signed in</div>
-        <div class="profile-hint">Scan your library card<br>to sign in</div>
-        <div class="profile-status signed-out">○ No card detected</div>
-      </div>
-    `;
-  }
+
+  screen.innerHTML = `
+    <header class="feat-header purple">
+      <button class="btn-back" id="back-btn">‹</button>
+      <span class="feat-title">Profile</span>
+    </header>
+    ${signedInMarkup}
+  `;
 
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('home'));
+  const signoutBtn = screen.querySelector('#signout-btn');
+  if (signoutBtn) {
+    signoutBtn.addEventListener('click', () => {
+      currentUser = null;
+      Router.go('home');
+    });
+  }
   screen.appendChild(makeBottomNav('profile'));
   return screen;
 });

@@ -1,54 +1,111 @@
-// ════════════════════════════════════════════════════════════
-//  RFID WebSocket Client — ECUAD Library Kiosk
-// ════════════════════════════════════════════════════════════
-//
-//  Connects to rfid_bridge.py (ws://localhost:8765) and fires
-//  a custom 'rfid-scan' event on document whenever a card is read.
-//
-//  Event detail: { cardId: "08007828B7" }
-//
-//  Auto-reconnects every 3 s if the bridge is not yet up.
-// ════════════════════════════════════════════════════════════
+// Local RFID event client.
+// Connects to the Pi-side bridge and emits browser events on each scan.
+const RFID = (() => {
+  const EVENTS_URL = 'http://127.0.0.1:8765/events';
+  const LAST_SCAN_URL = 'http://127.0.0.1:8765/last-scan';
+  let source = null;
+  let retryTimer = null;
+  let pollTimer = null;
+  let connected = false;
+  let lastSeenScanKey = '';
 
-(function () {
-  'use strict';
-
-  var WS_URL       = 'ws://localhost:8765';
-  var RECONNECT_MS = 3000;
-  var ws           = null;
-
-  function connect() {
-    try {
-      ws = new WebSocket(WS_URL);
-    } catch (e) {
-      console.warn('[RFID] Cannot create WebSocket:', e);
-      setTimeout(connect, RECONNECT_MS);
-      return;
-    }
-
-    ws.onopen = function () {
-      console.log('[RFID] Connected to bridge');
-    };
-
-    ws.onmessage = function (e) {
-      var cardId = String(e.data).trim().toUpperCase();
-      if (!cardId) return;
-      console.log('[RFID] Card scanned:', cardId);
-      document.dispatchEvent(new CustomEvent('rfid-scan', {
-        detail: { cardId: cardId }
-      }));
-    };
-
-    ws.onerror = function () {
-      // onclose always fires after onerror — reconnect handled there
-    };
-
-    ws.onclose = function () {
-      console.log('[RFID] Bridge disconnected — retry in ' + RECONNECT_MS + ' ms');
-      ws = null;
-      setTimeout(connect, RECONNECT_MS);
-    };
+  function emit(type, detail) {
+    window.dispatchEvent(new CustomEvent(type, { detail }));
   }
 
-  connect();
+  function handleScanPayload(payload) {
+    if (!payload || !payload.id) return;
+    const scanKey = String(payload.timestamp || '') + '|' + String(payload.id || '');
+    if (scanKey === lastSeenScanKey) return;
+    lastSeenScanKey = scanKey;
+    emit('rfid:scan', payload);
+  }
+
+  function connect() {
+    if (source) {
+      source.close();
+      source = null;
+    }
+
+    try {
+      source = new EventSource(EVENTS_URL);
+
+      source.addEventListener('open', () => {
+        connected = true;
+        emit('rfid:status', { connected: true });
+      });
+
+      source.addEventListener('scan', event => {
+        try {
+          const payload = JSON.parse(event.data || '{}');
+          handleScanPayload(payload);
+        } catch (_err) {
+          // Ignore malformed payloads.
+        }
+      });
+
+      source.addEventListener('error', () => {
+        if (connected) {
+          connected = false;
+          emit('rfid:status', { connected: false });
+        }
+        scheduleReconnect();
+      });
+    } catch (_err) {
+      scheduleReconnect();
+    }
+  }
+
+  function startPollingFallback() {
+    if (pollTimer) return;
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(LAST_SCAN_URL, { cache: 'no-store' });
+        if (!res.ok) return;
+        const body = await res.json();
+        if (!body || !body.last_scan) return;
+        handleScanPayload(body.last_scan);
+      } catch (_err) {
+        // Ignore polling errors; SSE may still be active.
+      }
+    }, 1200);
+  }
+
+  function scheduleReconnect() {
+    if (retryTimer) return;
+    if (source) {
+      source.close();
+      source = null;
+    }
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      connect();
+    }, 3000);
+  }
+
+  function start() {
+    connect();
+    startPollingFallback();
+  }
+
+  function stop() {
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+    if (source) {
+      source.close();
+      source = null;
+    }
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    connected = false;
+    emit('rfid:status', { connected: false });
+  }
+
+  return { start, stop };
 })();
+
+RFID.start();
