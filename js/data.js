@@ -102,7 +102,6 @@ const DATA = {
     { id: 99, title: "Earth beings : ecologies of practice across Andean worlds", author: "Marisol Cadena", year: "2015", callNumber: "GN564 .P4 C34 2015", shelf: "Stack E", genre: "Geography & Culture", stack: 'E', floor: 1 },
     { id: 100, title: "The handmade skateboard : design & build a custom longboard, cr…", author: "Matt Berger", year: "2014", callNumber: "GV859.8 .B47 2014", shelf: "Stack E", genre: "Geography & Culture", stack: 'E', floor: 1 },
   ],
-
   printingSteps: [
     {
       step: 1,
@@ -313,3 +312,30 @@ const DATA = {
 </svg>`,
 
 };
+
+// ── Assign row numbers and availability status to every book ──────────────
+// Row = position within the shelf (1–5). Status: ~70% available, ~15% each
+// checked-out / on-hold. Specific popular books are forced unavailable.
+(function () {
+  const rowCounters = {};
+  // Status pattern: 10-cycle with ~7 available, ~1.5 each unavailable
+  const STATUSES = [
+    'available','available','available','available','checked-out',
+    'available','available','available','on-hold','available',
+  ];
+  // IDs to force on-hold (popular / recognizable titles)
+  const ON_HOLD_IDS   = new Set([35, 44, 48, 53, 89, 97]);
+  // IDs to force checked-out
+  const CHECKED_IDS   = new Set([2, 12, 22, 34, 45, 58, 65, 80, 92]);
+
+  DATA.books.forEach((book, i) => {
+    const s = book.stack;
+    rowCounters[s] = (rowCounters[s] || 0);
+    book.row    = (rowCounters[s] % 5) + 1;
+    rowCounters[s]++;
+
+    if (ON_HOLD_IDS.has(book.id))        book.status = 'on-hold';
+    else if (CHECKED_IDS.has(book.id))   book.status = 'checked-out';
+    else                                  book.status = STATUSES[i % STATUSES.length];
+  });
+})();

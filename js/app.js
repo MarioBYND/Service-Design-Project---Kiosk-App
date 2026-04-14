@@ -898,9 +898,9 @@ Router.register('books', ({ stack } = {}) => {
         <div class="book-meta">
           <div class="book-title">${b.title}</div>
           <div class="book-author">${b.author}${b.year ? ' · ' + b.year : ''}</div>
-          <div class="book-call">${b.callNumber} &nbsp;·&nbsp; <span class="book-stack-tag">Shelf ${b.stack}</span></div>
+          <div class="book-call">${b.callNumber} &nbsp;·&nbsp; <span class="book-stack-tag">Shelf ${b.stack} · Row ${b.row}</span></div>
         </div>
-        <div class="book-chevron">›</div>
+        <span class="book-status-badge book-status-${b.status}">${b.status === 'available' ? 'Available' : b.status === 'checked-out' ? 'Checked Out' : 'On Hold'}</span>
       </div>
     `).join('');
 
@@ -968,6 +968,14 @@ Router.register('book-detail', ({ book }) => {
   const wayfindingRoom = STACK_ROOM[book.stack] || 'room-12';
   const floorLabel = book.floor === 1 ? 'First Floor' : 'Bottom Floor';
 
+  const statusLabel = book.status === 'available' ? 'Available' : book.status === 'checked-out' ? 'Checked Out' : 'On Hold';
+  const canCheckout = book.status === 'available' && currentUser;
+  const checkoutHint = !currentUser
+    ? '<p class="checkout-hint">Scan your library card to check out this book.</p>'
+    : book.status !== 'available'
+    ? `<p class="checkout-hint">${statusLabel} — this copy is not available right now.</p>`
+    : '';
+
   screen.innerHTML = `
     <header class="feat-header teal">
       <button class="btn-back" id="back-btn">‹</button>
@@ -978,6 +986,10 @@ Router.register('book-detail', ({ book }) => {
         <div class="detail-title">${book.title}</div>
         <div class="detail-author">${book.author} &middot; ${book.year}</div>
         <div class="detail-row">
+          <span class="detail-label">Status</span>
+          <span class="book-status-badge book-status-${book.status}">${statusLabel}</span>
+        </div>
+        <div class="detail-row">
           <span class="detail-label">Call Number</span>
           <span class="detail-val mono">${book.callNumber}</span>
         </div>
@@ -987,13 +999,15 @@ Router.register('book-detail', ({ book }) => {
         </div>
         <div class="detail-row">
           <span class="detail-label">Location</span>
-          <span class="detail-val">Shelf ${book.stack} — Level 1 Stacks</span>
+          <span class="detail-val">Shelf ${book.stack} · Row ${book.row} — Level 1 Stacks</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">Floor</span>
           <span class="detail-val">${floorLabel}</span>
         </div>
       </div>
+      ${checkoutHint}
+      ${canCheckout ? `<button class="btn-next-step" id="btn-checkout" style="margin:0 14px 10px;">Check Out This Book</button>` : ''}
       <div class="map-section">
         <p class="map-section-label">Stacks Location — ${floorLabel}</p>
         <div class="map-wrap" id="book-map"></div>
@@ -1002,9 +1016,82 @@ Router.register('book-detail', ({ book }) => {
   `;
 
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('books'));
+  const checkoutBtn = screen.querySelector('#btn-checkout');
+  if (checkoutBtn) {
+    checkoutBtn.addEventListener('click', () => Router.go('book-checkout', { book }));
+  }
   enableTouchScroll(screen.querySelector('.screen-body'));
   Wayfinding.initialize(screen.querySelector('#book-map'))
     .then(() => Wayfinding.drawRoute(wayfindingRoom));
+  screen.appendChild(makeBottomNav('home'));
+  return screen;
+});
+
+
+// ════════════════════════════════════════════════════════════
+//  BOOK CHECKOUT
+// ════════════════════════════════════════════════════════════
+
+Router.register('book-checkout', ({ book }) => {
+  const screen = document.createElement('div');
+  screen.className = 'screen';
+
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + 14);
+  const dueDateStr = dueDate.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+  const userName = currentUser ? currentUser.name : 'Guest';
+  const userId   = currentUser ? currentUser.id : '';
+
+  // QR encodes the checkout info as plain text — scannable on any phone
+  const qrText = encodeURIComponent(
+    'ECU Library Checkout\n' +
+    'Book: ' + book.title + '\n' +
+    'Student: ' + userName + ' (' + userId + ')\n' +
+    'Due: ' + dueDateStr + '\n' +
+    'Return to: ECU Library, 520 E 1st Ave, Vancouver'
+  );
+  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + qrText;
+
+  screen.innerHTML = `
+    <header class="feat-header teal">
+      <button class="btn-back" id="back-btn">‹</button>
+      <span class="feat-title">Check Out</span>
+    </header>
+    <div class="screen-body">
+      <div class="checkout-success">
+        <div class="success-circle" style="background:var(--teal);">✓</div>
+        <h2 class="success-title">Checked Out!</h2>
+        <p class="success-body">Checked out to <strong>${userName}</strong>.<br>Please return by <strong>${dueDateStr}</strong>.</p>
+      </div>
+      <div class="receipt-card">
+        <div class="receipt-logo">ECU Library</div>
+        <div class="receipt-subtitle">Checkout Receipt</div>
+        <div class="receipt-divider"></div>
+        <div class="receipt-row"><span>Student</span><span>${userName}</span></div>
+        <div class="receipt-row"><span>ID</span><span>${userId}</span></div>
+        <div class="receipt-divider"></div>
+        <div class="receipt-row"><span>Title</span><span class="receipt-doc-name">${book.title}</span></div>
+        <div class="receipt-row"><span>Author</span><span>${book.author}</span></div>
+        <div class="receipt-row"><span>Location</span><span>Shelf ${book.stack} · Row ${book.row}</span></div>
+        <div class="receipt-divider"></div>
+        <div class="receipt-total"><span>Due Date</span><span>${dueDateStr}</span></div>
+      </div>
+      <div class="qr-section">
+        <p class="qr-label">Scan to save — get a due date reminder on your phone</p>
+        <img class="qr-code" src="${qrUrl}" alt="Checkout QR code"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+        <p class="qr-fallback" style="display:none;">QR code requires internet connection.</p>
+      </div>
+      <button class="btn-done" id="btn-home" style="margin:0 14px 20px;">Done — Back to Home</button>
+    </div>
+  `;
+
+  // Mark book as checked out in memory for this session
+  book.status = 'checked-out';
+
+  screen.querySelector('#back-btn').addEventListener('click', () => Router.go('book-detail', { book }));
+  screen.querySelector('#btn-home').addEventListener('click', () => Router.go('home'));
+  enableTouchScroll(screen.querySelector('.screen-body'));
   screen.appendChild(makeBottomNav('home'));
   return screen;
 });

@@ -1758,6 +1758,67 @@ html, body {
   cursor: pointer;
 }
 
+/* ── Book status badges ──────────────────────────────────── */
+.book-status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.book-status-available   { background: #e6f9f1; color: #1a7a4e; }
+.book-status-checked-out { background: #fde8e8; color: #c0392b; }
+.book-status-on-hold     { background: #fff3cd; color: #856404; }
+
+/* Book list item with status badge */
+.book-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.book-meta { flex: 1; min-width: 0; }
+
+/* Checkout hint below detail card */
+.checkout-hint {
+  font-size: 14px;
+  color: var(--gray-3);
+  text-align: center;
+  padding: 8px 18px 2px;
+}
+
+/* QR code section */
+.qr-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 14px 8px;
+  gap: 8px;
+}
+.qr-label {
+  font-size: 13px;
+  color: var(--gray-3);
+  text-align: center;
+}
+.qr-code {
+  width: 160px;
+  height: 160px;
+  border: 2px solid var(--gray-2);
+  border-radius: 10px;
+}
+.qr-fallback {
+  font-size: 13px;
+  color: var(--gray-3);
+}
+.checkout-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 14px 10px;
+  gap: 6px;
+}
+
 /* ── Print Receipt ───────────────────────────────────────── */
 .receipt-card {
   margin: 16px 14px 12px;
