@@ -9,12 +9,14 @@ const IDLE_MS = 60000;
 
 function showIdleOverlay() {
   if (document.getElementById('idle-overlay')) return;
+  // Sign out current user when kiosk goes idle
+  currentUser = null;
   const overlay = document.createElement('div');
   overlay.id = 'idle-overlay';
   overlay.className = 'idle-screen';
   overlay.innerHTML = `
     <p class="idle-eyebrow">Emily Carr University · Library</p>
-    <h1 class="idle-headline">ECUAD<br><span class="hl-teal">LIBRARY</span></h1>
+    <h1 class="idle-headline">ECU<br><span class="hl-teal">LIBRARY</span></h1>
     <div class="idle-divider"></div>
     <p class="idle-cta">Tap anywhere to start</p>
     <div class="idle-bar"><span></span><span></span><span></span></div>
@@ -176,7 +178,7 @@ Router.register('home', () => {
 
   screen.innerHTML = `
     <div class="home-header">
-      <span class="home-logo">ECUAD Library</span>
+      <span class="home-logo">ECU Library</span>
       <span class="home-sub">${currentUser ? 'Signed in: ' + currentUser.name : 'Self-Service Kiosk'}</span>
     </div>
     <div class="home-scroll">
@@ -324,21 +326,36 @@ Router.register('print-guide', () => {
 //  PRINT DOCS — STEP 1: Find document by student ID
 // ════════════════════════════════════════════════════════════
 
-// All queued documents — shown by default, filtered by search
-const MOCK_DOCS = [
-  { id: 1,  ownerId: '9047000011', name: 'Final_Thesis_Draft.pdf',          pages: 24, size: '3.2 MB', sent: '8:41 AM', ext: 'pdf' },
-  { id: 2,  ownerId: '9047000011', name: 'Studio_Presentation_Final.pdf',   pages: 12, size: '1.8 MB', sent: '8:39 AM', ext: 'pdf' },
-  { id: 3,  ownerId: '9047000199', name: 'Exhibition_Poster_A3.pdf',        pages: 1,  size: '4.5 MB', sent: '9:02 AM', ext: 'pdf' },
-  { id: 4,  ownerId: '9047000199', name: 'Artist_Statement_v2.docx',        pages: 2,  size: '0.3 MB', sent: '9:00 AM', ext: 'doc' },
-  { id: 5,  ownerId: '9047000420', name: 'Reading_Response_Week8.pdf',      pages: 3,  size: '0.6 MB', sent: '7:55 AM', ext: 'pdf' },
-  { id: 6,  ownerId: '9047000420', name: 'Capstone_Project_Brief.pdf',      pages: 8,  size: '1.1 MB', sent: '9:15 AM', ext: 'pdf' },
-  { id: 7,  ownerId: '9047001234', name: 'Colour_Theory_Assignment.pdf',    pages: 5,  size: '2.4 MB', sent: '9:18 AM', ext: 'pdf' },
-  { id: 8,  ownerId: '9047001234', name: 'Typography_Specimen_Sheet.pdf',   pages: 2,  size: '0.9 MB', sent: '9:22 AM', ext: 'pdf' },
-  { id: 9,  ownerId: '9047008899', name: 'Process_Journal_Oct.docx',        pages: 14, size: '0.5 MB', sent: '9:30 AM', ext: 'doc' },
-  { id: 10, ownerId: '9047008899', name: 'Wayfinding_System_Proposal.pdf',  pages: 6,  size: '3.7 MB', sent: '9:33 AM', ext: 'pdf' },
-  { id: 11, ownerId: '9047007777', name: 'Photo_Series_Contact_Sheet.pdf',  pages: 4,  size: '5.2 MB', sent: '9:40 AM', ext: 'pdf' },
-  { id: 12, ownerId: '9047007777', name: 'Service_Design_Report.pdf',       pages: 18, size: '2.0 MB', sent: '9:44 AM', ext: 'pdf' },
-];
+// Per-user queued documents — keyed by user id
+const USER_DOCS = {
+  'u-001': [  // Ken Wan
+    { id: 1, name: 'Ken_Wan_Thesis_Proposal.pdf',         pages: 18, size: '2.4 MB', sent: '8:31 AM', ext: 'pdf' },
+    { id: 2, name: 'Ken_Wan_UX_Research_Report.pdf',      pages: 12, size: '1.7 MB', sent: '8:44 AM', ext: 'pdf' },
+    { id: 3, name: 'Ken_Wan_Interaction_Prototype.pdf',   pages: 6,  size: '3.1 MB', sent: '9:02 AM', ext: 'pdf' },
+    { id: 4, name: 'Ken_Wan_Process_Journal.docx',        pages: 22, size: '0.8 MB', sent: '9:15 AM', ext: 'doc' },
+    { id: 5, name: 'Wayfinding_System_Proposal.pdf',      pages: 8,  size: '4.2 MB', sent: '9:28 AM', ext: 'pdf' },
+  ],
+  'u-002': [  // Max McDonough
+    { id: 1, name: 'Max_McDonough_Capstone_Brief.pdf',    pages: 10, size: '1.9 MB', sent: '8:38 AM', ext: 'pdf' },
+    { id: 2, name: 'Max_McDonough_Exhibition_Poster.pdf', pages: 1,  size: '5.3 MB', sent: '8:52 AM', ext: 'pdf' },
+    { id: 3, name: 'Max_McDonough_Studio_Critique.pdf',   pages: 4,  size: '0.6 MB', sent: '9:05 AM', ext: 'pdf' },
+    { id: 4, name: 'Max_McDonough_Design_Manifesto.docx', pages: 3,  size: '0.4 MB', sent: '9:18 AM', ext: 'doc' },
+    { id: 5, name: 'Service_Design_Research_v2.pdf',      pages: 14, size: '2.8 MB', sent: '9:33 AM', ext: 'pdf' },
+  ],
+  default: [
+    { id: 1,  name: 'Final_Thesis_Draft.pdf',          pages: 24, size: '3.2 MB', sent: '8:41 AM', ext: 'pdf' },
+    { id: 2,  name: 'Studio_Presentation_Final.pdf',   pages: 12, size: '1.8 MB', sent: '8:39 AM', ext: 'pdf' },
+    { id: 3,  name: 'Exhibition_Poster_A3.pdf',        pages: 1,  size: '4.5 MB', sent: '9:02 AM', ext: 'pdf' },
+    { id: 4,  name: 'Artist_Statement_v2.docx',        pages: 2,  size: '0.3 MB', sent: '9:00 AM', ext: 'doc' },
+    { id: 5,  name: 'Reading_Response_Week8.pdf',      pages: 3,  size: '0.6 MB', sent: '7:55 AM', ext: 'pdf' },
+    { id: 6,  name: 'Capstone_Project_Brief.pdf',      pages: 8,  size: '1.1 MB', sent: '9:15 AM', ext: 'pdf' },
+  ],
+};
+
+function getDocsForUser() {
+  if (currentUser && USER_DOCS[currentUser.id]) return USER_DOCS[currentUser.id];
+  return USER_DOCS.default;
+}
 
 function makeWizardSteps(activeStep) {
   // activeStep: 1-based; connector lines drawn via CSS ::after
@@ -394,16 +411,14 @@ Router.register('print-docs', ({ cardId, source } = {}) => {
   const kbToggle = screen.querySelector('#doc-kb-toggle');
 
   function renderDocs() {
+    const docs = getDocsForUser();
     const q = searchQuery.toLowerCase().trim();
     const filtered = q
-      ? MOCK_DOCS.filter(d =>
-          d.name.toLowerCase().includes(q) ||
-          String(d.ownerId || '').toLowerCase().includes(q)
-        )
-      : MOCK_DOCS;
+      ? docs.filter(d => d.name.toLowerCase().includes(q))
+      : docs;
 
     if (!filtered.length) {
-      listArea.innerHTML = `<p class="doc-not-found">No documents match "<strong>${searchQuery}</strong>".<br>Make sure your file was sent to print@ecuad.ca</p>`;
+      listArea.innerHTML = `<p class="doc-not-found">No documents match "<strong>${searchQuery}</strong>".<br>Make sure your file was sent to print@ecu.ca</p>`;
       return;
     }
 
@@ -412,7 +427,7 @@ Router.register('print-docs', ({ cardId, source } = {}) => {
         <div class="doc-icon">${EXT_ICON[d.ext] || '📄'}</div>
         <div class="doc-info">
           <div class="doc-name">${d.name}</div>
-          <div class="doc-meta">Card ${d.ownerId} · ${d.pages} page${d.pages !== 1 ? 's' : ''} · ${d.size} · Sent ${d.sent}</div>
+          <div class="doc-meta">${d.pages} page${d.pages !== 1 ? 's' : ''} · ${d.size} · Sent ${d.sent}</div>
         </div>
         <div class="doc-select-indicator">›</div>
       </div>
@@ -420,7 +435,7 @@ Router.register('print-docs', ({ cardId, source } = {}) => {
 
     listArea.querySelectorAll('.doc-item').forEach(el => {
       el.addEventListener('click', () => {
-        const doc = MOCK_DOCS.find(d => d.id === parseInt(el.dataset.id));
+        const doc = getDocsForUser().find(d => d.id === parseInt(el.dataset.id));
         Router.go('print-docs-settings', { doc });
       });
     });
@@ -627,7 +642,7 @@ Router.register('print-docs-confirm', ({ doc, printer, colour, size, copies, tot
   );
 
   screen.querySelector('#btn-send').addEventListener('click', () => {
-    Router.go('print-docs-success', { doc, printer });
+    Router.go('print-docs-success', { doc, printer, colour, size, copies, total });
   });
 
   enableTouchScroll(screen.querySelector('.wizard-body-scroll'));
@@ -640,7 +655,7 @@ Router.register('print-docs-confirm', ({ doc, printer, colour, size, copies, tot
 //  PRINT DOCS — STEP 4: Success
 // ════════════════════════════════════════════════════════════
 
-Router.register('print-docs-success', ({ doc, printer }) => {
+Router.register('print-docs-success', ({ doc, printer, colour, size, copies, total }) => {
   const screen = document.createElement('div');
   screen.className = 'screen';
 
@@ -656,6 +671,7 @@ Router.register('print-docs-success', ({ doc, printer }) => {
           <strong>${doc.name}</strong> has been sent to <strong>${printer.name}</strong>.<br><br>
           Walk to the printer and tap your student card on the reader to release your job.
         </p>
+        <button class="btn-next-step" id="btn-receipt" style="margin-bottom:10px;">View Receipt</button>
         <button class="btn-done" id="btn-done">Done — Back to Home</button>
       </div>
       <p class="map-section-label" style="padding: 0 14px 8px; color: var(--mag);">Printer Location — First Floor</p>
@@ -663,9 +679,149 @@ Router.register('print-docs-success', ({ doc, printer }) => {
     </div>
   `;
 
-  screen.querySelector('#btn-done').addEventListener('click', () => Router.go('home'));
+  screen.querySelector('#btn-receipt').addEventListener('click', () =>
+    Router.go('print-receipt', { doc, printer, colour, size, copies, total })
+  );
+  screen.querySelector('#btn-done').addEventListener('click', () =>
+    Router.go('print-feedback')
+  );
+  enableTouchScroll(screen.querySelector('.screen-body'));
   Wayfinding.initialize(screen.querySelector('#success-map'))
     .then(() => Wayfinding.drawRoute('studio-a'));
+  screen.appendChild(makeBottomNav('home'));
+  return screen;
+});
+
+
+// ════════════════════════════════════════════════════════════
+//  PRINT RECEIPT
+// ════════════════════════════════════════════════════════════
+
+Router.register('print-receipt', ({ doc, printer, colour, size, copies, total }) => {
+  const screen = document.createElement('div');
+  screen.className = 'screen';
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
+  const dateStr = now.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+  const colourLabel = colour === 'colour' ? 'Colour' : 'Black & White';
+  const sizeLabel   = size === 'a3' ? 'A3 (11×17)' : 'Letter (8.5×11)';
+  const userName    = currentUser ? currentUser.name : 'Guest';
+
+  screen.innerHTML = `
+    <header class="feat-header mag">
+      <button class="btn-back" id="back-btn">‹</button>
+      <span class="feat-title">Receipt</span>
+    </header>
+    <div class="screen-body">
+      <div class="receipt-card">
+        <div class="receipt-logo">ECU Library</div>
+        <div class="receipt-subtitle">Print Confirmation</div>
+        <div class="receipt-divider"></div>
+        <div class="receipt-row"><span>Student</span><span>${userName}</span></div>
+        <div class="receipt-row"><span>Date</span><span>${dateStr}</span></div>
+        <div class="receipt-row"><span>Time</span><span>${timeStr}</span></div>
+        <div class="receipt-divider"></div>
+        <div class="receipt-row"><span>Document</span><span class="receipt-doc-name">${doc.name}</span></div>
+        <div class="receipt-row"><span>Pages</span><span>${doc.pages}</span></div>
+        <div class="receipt-row"><span>Copies</span><span>${copies}</span></div>
+        <div class="receipt-row"><span>Colour</span><span>${colourLabel}</span></div>
+        <div class="receipt-row"><span>Paper</span><span>${sizeLabel}</span></div>
+        <div class="receipt-row"><span>Printer</span><span>${printer.name}</span></div>
+        <div class="receipt-divider"></div>
+        <div class="receipt-total"><span>Total Charged</span><span>$${total}</span></div>
+        <div class="receipt-note">Deducted from your print balance.<br>Top up at the Library Desk.</div>
+      </div>
+      <button class="btn-next-step" id="btn-feedback" style="margin: 0 14px 14px;">Leave Feedback</button>
+      <button class="btn-done" id="btn-home" style="margin: 0 14px 20px;">Done — Back to Home</button>
+    </div>
+  `;
+
+  screen.querySelector('#back-btn').addEventListener('click', () => Router.go('print-docs-success', { doc, printer, colour, size, copies, total }));
+  screen.querySelector('#btn-feedback').addEventListener('click', () => Router.go('print-feedback'));
+  screen.querySelector('#btn-home').addEventListener('click', () => Router.go('home'));
+  enableTouchScroll(screen.querySelector('.screen-body'));
+  screen.appendChild(makeBottomNav('home'));
+  return screen;
+});
+
+
+// ════════════════════════════════════════════════════════════
+//  PRINT FEEDBACK
+// ════════════════════════════════════════════════════════════
+
+Router.register('print-feedback', () => {
+  const screen = document.createElement('div');
+  screen.className = 'screen';
+
+  screen.innerHTML = `
+    <header class="feat-header mag">
+      <span class="feat-title">Feedback</span>
+    </header>
+    <div class="feedback-body">
+      <div class="feedback-question">How was your printing experience?</div>
+      <div class="feedback-emojis">
+        <button class="feedback-emoji-btn" data-val="5">😊<span>Great</span></button>
+        <button class="feedback-emoji-btn" data-val="3">😐<span>Okay</span></button>
+        <button class="feedback-emoji-btn" data-val="1">😞<span>Difficult</span></button>
+      </div>
+      <div class="feedback-question" style="margin-top:24px;">What did you use today?</div>
+      <div class="feedback-chips">
+        <button class="feedback-chip" data-tag="print">🖨 Printing</button>
+        <button class="feedback-chip" data-tag="books">📚 Find a Book</button>
+        <button class="feedback-chip" data-tag="charge">🔌 Charging</button>
+        <button class="feedback-chip" data-tag="map">🗺 Map</button>
+        <button class="feedback-chip" data-tag="staff">👤 Staff Help</button>
+      </div>
+      <button class="btn-next-step" id="btn-submit" style="margin-top:auto;" disabled>Submit Feedback</button>
+      <button class="btn-done" id="btn-skip">Skip — Back to Home</button>
+    </div>
+  `;
+
+  let selectedRating = null;
+  const submitBtn = screen.querySelector('#btn-submit');
+
+  screen.querySelectorAll('.feedback-emoji-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      screen.querySelectorAll('.feedback-emoji-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedRating = btn.dataset.val;
+      submitBtn.disabled = false;
+    });
+  });
+
+  screen.querySelectorAll('.feedback-chip').forEach(chip => {
+    chip.addEventListener('click', () => chip.classList.toggle('selected'));
+  });
+
+  submitBtn.addEventListener('click', () => Router.go('feedback-thanks'));
+  screen.querySelector('#btn-skip').addEventListener('click', () => Router.go('home'));
+  screen.appendChild(makeBottomNav('home'));
+  return screen;
+});
+
+
+// ════════════════════════════════════════════════════════════
+//  FEEDBACK THANK YOU
+// ════════════════════════════════════════════════════════════
+
+Router.register('feedback-thanks', () => {
+  const screen = document.createElement('div');
+  screen.className = 'screen';
+
+  screen.innerHTML = `
+    <header class="feat-header mag">
+      <span class="feat-title">Feedback</span>
+    </header>
+    <div class="maint-body">
+      <div class="maint-icon">🙏</div>
+      <h1 class="maint-title">Thank You!</h1>
+      <p class="maint-text">Your feedback helps us improve the ECU Library experience for everyone.</p>
+      <button class="btn-next-step" id="btn-home" style="max-width:320px;margin:24px auto 0;">Back to Home</button>
+    </div>
+  `;
+
+  screen.querySelector('#btn-home').addEventListener('click', () => Router.go('home'));
   screen.appendChild(makeBottomNav('home'));
   return screen;
 });
