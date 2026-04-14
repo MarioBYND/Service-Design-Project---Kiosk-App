@@ -801,14 +801,12 @@ Router.register('print-receipt', ({ doc, printer, colour, size, copies, total })
         <div class="receipt-total"><span>Total Charged</span><span>$${total}</span></div>
         <div class="receipt-note">Deducted from your print balance.<br>Top up at the Library Desk.</div>
       </div>
-      <button class="btn-next-step" id="btn-feedback" style="margin: 0 14px 14px;">Leave Feedback</button>
-      <button class="btn-done" id="btn-home" style="margin: 0 14px 20px;">Done — Back to Home</button>
+      <button class="btn-next-step" id="btn-feedback" style="margin: 0 14px 20px;">Leave Feedback</button>
     </div>
   `;
 
   screen.querySelector('#back-btn').addEventListener('click', () => Router.go('print-docs-success', { doc, printer, colour, size, copies, total }));
   screen.querySelector('#btn-feedback').addEventListener('click', () => Router.go('print-feedback'));
-  screen.querySelector('#btn-home').addEventListener('click', () => Router.go('home'));
   enableTouchScroll(screen.querySelector('.screen-body'));
   screen.appendChild(makeBottomNav('home'));
   return screen;
