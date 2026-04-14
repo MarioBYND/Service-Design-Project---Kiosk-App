@@ -376,7 +376,7 @@ Router.register('print-docs', ({ cardId, source } = {}) => {
   const screen = document.createElement('div');
   screen.className = 'screen';
 
-  let searchQuery = (cardId || lastScannedCardId || '').trim();
+  let searchQuery = '';
   let kbVisible = false;
 
   const EXT_ICON = { pdf: '📄', doc: '📝' };
@@ -814,7 +814,6 @@ Router.register('feedback-thanks', () => {
       <span class="feat-title">Feedback</span>
     </header>
     <div class="maint-body">
-      <div class="maint-icon">🙏</div>
       <h1 class="maint-title">Thank You!</h1>
       <p class="maint-text">Your feedback helps us improve the ECU Library experience for everyone.</p>
       <button class="btn-next-step" id="btn-home" style="max-width:320px;margin:24px auto 0;">Back to Home</button>
@@ -969,12 +968,6 @@ Router.register('book-detail', ({ book }) => {
   const floorLabel = book.floor === 1 ? 'First Floor' : 'Bottom Floor';
 
   const statusLabel = book.status === 'available' ? 'Available' : book.status === 'checked-out' ? 'Checked Out' : 'On Hold';
-  const canCheckout = book.status === 'available' && currentUser;
-  const checkoutHint = !currentUser
-    ? '<p class="checkout-hint">Scan your library card to check out this book.</p>'
-    : book.status !== 'available'
-    ? `<p class="checkout-hint">${statusLabel} — this copy is not available right now.</p>`
-    : '';
 
   screen.innerHTML = `
     <header class="feat-header teal">
@@ -1006,8 +999,7 @@ Router.register('book-detail', ({ book }) => {
           <span class="detail-val">${floorLabel}</span>
         </div>
       </div>
-      ${checkoutHint}
-      ${canCheckout ? `<button class="btn-next-step" id="btn-checkout" style="margin:0 14px 10px;">Check Out This Book</button>` : ''}
+      <div id="checkout-area"></div>
       <div class="map-section">
         <p class="map-section-label">Stacks Location — ${floorLabel}</p>
         <div class="map-wrap" id="book-map"></div>
@@ -1015,11 +1007,37 @@ Router.register('book-detail', ({ book }) => {
     </div>
   `;
 
-  screen.querySelector('#back-btn').addEventListener('click', () => Router.go('books'));
-  const checkoutBtn = screen.querySelector('#btn-checkout');
-  if (checkoutBtn) {
-    checkoutBtn.addEventListener('click', () => Router.go('book-checkout', { book }));
+  // Render the checkout area based on current sign-in state
+  function renderCheckoutArea() {
+    const area = screen.querySelector('#checkout-area');
+    if (!area) return;
+    if (book.status !== 'available') {
+      area.innerHTML = `<p class="checkout-hint">${statusLabel} — this copy is not available right now.</p>`;
+    } else if (!currentUser) {
+      area.innerHTML = `<p class="checkout-hint">Scan your library card to check out this book.</p>`;
+    } else {
+      area.innerHTML = `<button class="btn-next-step" id="btn-checkout" style="margin:0 14px 10px;">Check Out This Book</button>`;
+      area.querySelector('#btn-checkout').addEventListener('click', () => Router.go('book-checkout', { book }));
+    }
   }
+
+  renderCheckoutArea();
+
+  // Listen for card scans while on this screen — reveal checkout button immediately
+  function onScanWhileOnScreen() {
+    if (!screen.isConnected) {
+      window.removeEventListener('rfid:scan', onScanWhileOnScreen);
+      return;
+    }
+    renderCheckoutArea();
+  }
+  window.addEventListener('rfid:scan', onScanWhileOnScreen);
+
+  screen.querySelector('#back-btn').addEventListener('click', () => {
+    window.removeEventListener('rfid:scan', onScanWhileOnScreen);
+    Router.go('books');
+  });
+
   enableTouchScroll(screen.querySelector('.screen-body'));
   Wayfinding.initialize(screen.querySelector('#book-map'))
     .then(() => Wayfinding.drawRoute(wayfindingRoom));
