@@ -3,46 +3,6 @@
 //  All screens · Inter design system · ECUAD brand colours
 // ════════════════════════════════════════════════════════════
 
-// ════════════════════════════════════════════════════════════
-//  RFID — card → user mapping + sign-in state
-// ════════════════════════════════════════════════════════════
-
-const RFID_USERS = {
-  '08007828B7': { name: 'Demo User One',  id: 'S001' },
-  '08006F1759': { name: 'Demo User Two',  id: 'S002' },
-};
-
-let currentUser = null;   // null = not signed in
-
-window.addEventListener('rfid:scan', (e) => {
-  const cardId = (e.detail.id || '').toUpperCase();
-  const user   = RFID_USERS[cardId];
-  if (user) {
-    currentUser = user;
-    console.log('[RFID] Signed in:', user.name);
-    // Show a brief toast then stay on the current screen
-    showRfidToast(user.name);
-  } else {
-    console.log('[RFID] Unknown card:', cardId);
-  }
-});
-
-function showRfidToast(name) {
-  const existing = document.getElementById('rfid-toast');
-  if (existing) existing.remove();
-
-  const toast = document.createElement('div');
-  toast.id = 'rfid-toast';
-  toast.className = 'rfid-toast';
-  toast.textContent = '✓ Signed in as ' + name;
-  document.getElementById('app').appendChild(toast);
-
-  // Fade out after 2.5 s
-  setTimeout(() => toast.classList.add('rfid-toast--hide'), 2500);
-  setTimeout(() => toast.remove(), 3200);
-}
-
-
 // ── Idle timer ────────────────────────────────────────────────
 let idleTimer = null;
 const IDLE_MS = 60000;
