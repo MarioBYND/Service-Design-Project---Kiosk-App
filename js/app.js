@@ -72,8 +72,11 @@ window.addEventListener('rfid:scan', e => {
   lastScannedCardId = cardId;
   currentUser = resolveUserFromCard(cardId);
 
-  const activeRoute = Router.current() || 'home';
-  Router.go(activeRoute);
+  // Avoid force re-rendering the current screen on every scan,
+  // which can feel glitchy during touch interactions.
+  if (Router.current() === 'profile') {
+    Router.go('profile');
+  }
 });
 
 
