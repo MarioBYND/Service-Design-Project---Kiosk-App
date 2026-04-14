@@ -138,23 +138,45 @@ function makeBottomNav(activeItem = 'home') {
 
 
 // ── Touch scroll (RPi Chromium fix) ───────────────────────────
-// In Chromium kiosk with `user-select:none` on *, touch-action:pan-y
-// alone is unreliable. This manually drives scrollTop from touch events.
-function enableTouchScroll(el) {
-  if (!el) return;
-  let lastY = null;
-  el.addEventListener('touchstart', e => {
-    lastY = e.touches[0].clientY;
+// Global IIFE: walks the DOM upward from the touch target to find the
+// nearest scrollable ancestor, then drives its scrollTop/scrollLeft.
+// This covers every scroll container on every screen automatically.
+(function () {
+  var startY = 0, startX = 0, scrollEl = null, scrollAxis = 'y';
+
+  function getScrollParent(el) {
+    while (el && el !== document.body) {
+      var s = window.getComputedStyle(el);
+      if ((s.overflowY === 'auto' || s.overflowY === 'scroll') &&
+          el.scrollHeight > el.clientHeight + 1) return { el: el, axis: 'y' };
+      if ((s.overflowX === 'auto' || s.overflowX === 'scroll') &&
+          el.scrollWidth  > el.clientWidth  + 1) return { el: el, axis: 'x' };
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  document.addEventListener('touchstart', function (e) {
+    var f = getScrollParent(e.target);
+    scrollEl   = f ? f.el   : null;
+    scrollAxis = f ? f.axis : 'y';
+    startY = e.touches[0].clientY;
+    startX = e.touches[0].clientX;
   }, { passive: true });
-  el.addEventListener('touchmove', e => {
-    if (lastY === null) return;
-    const y = e.touches[0].clientY;
-    el.scrollTop += lastY - y;
-    lastY = y;
+
+  document.addEventListener('touchmove', function (e) {
+    if (!scrollEl) return;
+    var t = e.touches[0];
+    if (scrollAxis === 'y') { scrollEl.scrollTop  += startY - t.clientY; startY = t.clientY; }
+    else                    { scrollEl.scrollLeft += startX - t.clientX; startX = t.clientX; }
   }, { passive: true });
-  el.addEventListener('touchend',   () => { lastY = null; }, { passive: true });
-  el.addEventListener('touchcancel',() => { lastY = null; }, { passive: true });
-}
+
+  document.addEventListener('touchend',    function () { scrollEl = null; }, { passive: true });
+  document.addEventListener('touchcancel', function () { scrollEl = null; }, { passive: true });
+})();
+
+// No-op kept so existing enableTouchScroll() call sites don't break.
+function enableTouchScroll() {}
 
 // ── Scroll hint ───────────────────────────────────────────────
 // Shows a gradient fade + bouncing chevron at the bottom of `screen`
@@ -388,86 +410,108 @@ Router.register('print-docs', ({ cardId, source } = {}) => {
     </header>
     ${makeWizardSteps(1)}
     <div class="wizard-body">
+      <div id="print-signin-area"></div>
+    </div>
+  `;
+
+  screen.querySelector('#back-btn').addEventListener('click', () => {
+    window.removeEventListener('rfid:scan', onScanWhileOnScreen);
+    Router.go('print');
+  });
+
+  const wizardBody = screen.querySelector('.wizard-body');
+
+  function renderPrintArea() {
+    const area = screen.querySelector('#print-signin-area');
+    if (!area) return;
+
+    if (!currentUser) {
+      area.innerHTML = `<p class="checkout-hint">Scan your library card to see your print queue.</p>`;
+      return;
+    }
+
+    // User is signed in — show the full search + doc list UI
+    area.innerHTML = `
       <div class="doc-search-bar">
         <div class="doc-search-field">
           <span class="doc-search-icon">🔍</span>
           <input class="doc-search-input" id="doc-search-input" type="text"
-            placeholder="Search by file name or card ID..." readonly />
+            placeholder="Search by file name..." readonly />
           <button class="doc-kb-toggle" id="doc-kb-toggle">⌨</button>
         </div>
       </div>
-      ${source === 'rfid' && searchQuery ? `<p class="doc-list-label">Card scanned: <strong>${searchQuery}</strong></p>` : ''}
-      <p class="doc-list-label">Queued documents — tap one to select</p>
+      <p class="doc-list-label">Queued documents for <strong>${currentUser.name}</strong> — tap one to select</p>
       <div class="doc-list-scroll" id="doc-list-area"></div>
       <div class="doc-keyboard-panel" id="doc-kb-panel" style="display:none"></div>
-    </div>
-  `;
+    `;
 
-  screen.querySelector('#back-btn').addEventListener('click', () => Router.go('print'));
+    const input    = area.querySelector('#doc-search-input');
+    const listArea = area.querySelector('#doc-list-area');
+    const kbPanel  = area.querySelector('#doc-kb-panel');
+    const kbToggle = area.querySelector('#doc-kb-toggle');
+    let kbVisible  = false;
 
-  const input = screen.querySelector('#doc-search-input');
-  const listArea = screen.querySelector('#doc-list-area');
-  const kbPanel = screen.querySelector('#doc-kb-panel');
-  const kbToggle = screen.querySelector('#doc-kb-toggle');
+    function renderDocs() {
+      const docs = getDocsForUser();
+      const q = searchQuery.toLowerCase().trim();
+      const filtered = q ? docs.filter(d => d.name.toLowerCase().includes(q)) : docs;
 
-  function renderDocs() {
-    const docs = getDocsForUser();
-    const q = searchQuery.toLowerCase().trim();
-    const filtered = q
-      ? docs.filter(d => d.name.toLowerCase().includes(q))
-      : docs;
+      if (!filtered.length) {
+        listArea.innerHTML = `<p class="doc-not-found">No documents match "<strong>${searchQuery}</strong>".<br>Make sure your file was sent to print@ecu.ca</p>`;
+        return;
+      }
 
-    if (!filtered.length) {
-      listArea.innerHTML = `<p class="doc-not-found">No documents match "<strong>${searchQuery}</strong>".<br>Make sure your file was sent to print@ecu.ca</p>`;
-      return;
+      listArea.innerHTML = filtered.map(d => `
+        <div class="doc-item" data-id="${d.id}">
+          <div class="doc-icon">${EXT_ICON[d.ext] || '📄'}</div>
+          <div class="doc-info">
+            <div class="doc-name">${d.name}</div>
+            <div class="doc-meta">${d.pages} page${d.pages !== 1 ? 's' : ''} · ${d.size} · Sent ${d.sent}</div>
+          </div>
+          <div class="doc-select-indicator">›</div>
+        </div>
+      `).join('');
+
+      listArea.querySelectorAll('.doc-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const doc = getDocsForUser().find(d => d.id === parseInt(el.dataset.id));
+          Router.go('print-docs-settings', { doc });
+        });
+      });
     }
 
-    listArea.innerHTML = filtered.map(d => `
-      <div class="doc-item" data-id="${d.id}">
-        <div class="doc-icon">${EXT_ICON[d.ext] || '📄'}</div>
-        <div class="doc-info">
-          <div class="doc-name">${d.name}</div>
-          <div class="doc-meta">${d.pages} page${d.pages !== 1 ? 's' : ''} · ${d.size} · Sent ${d.sent}</div>
-        </div>
-        <div class="doc-select-indicator">›</div>
-      </div>
-    `).join('');
+    input.addEventListener('input', e => { searchQuery = e.target.value; renderDocs(); });
 
-    listArea.querySelectorAll('.doc-item').forEach(el => {
-      el.addEventListener('click', () => {
-        const doc = getDocsForUser().find(d => d.id === parseInt(el.dataset.id));
-        Router.go('print-docs-settings', { doc });
-      });
+    const kb = Keyboard.create(q => { searchQuery = q; input.value = q; renderDocs(); });
+    kb.bindInput(input);
+    kbPanel.appendChild(kb.el);
+
+    kbToggle.addEventListener('click', () => {
+      kbVisible = !kbVisible;
+      kbPanel.style.display = kbVisible ? 'block' : 'none';
+      kbToggle.classList.toggle('active', kbVisible);
     });
+
+    area.querySelector('.doc-search-field').addEventListener('click', () => {
+      if (!kbVisible) {
+        kbVisible = true;
+        kbPanel.style.display = 'block';
+        kbToggle.classList.add('active');
+      }
+    });
+
+    renderDocs();
   }
 
-  input.addEventListener('input', e => { searchQuery = e.target.value; renderDocs(); });
-
-  const kb = Keyboard.create(q => { searchQuery = q; input.value = q; renderDocs(); });
-  kb.bindInput(input);
-  kbPanel.appendChild(kb.el);
-
-  if (searchQuery) input.value = searchQuery;
-
-  kbToggle.addEventListener('click', () => {
-    kbVisible = !kbVisible;
-    kbPanel.style.display = kbVisible ? 'block' : 'none';
-    kbToggle.classList.toggle('active', kbVisible);
-  });
-
-  // Tapping anywhere in the search bar opens the keyboard
-  // (listener on the wrapper, not the readonly input — readonly blocks click on Chromium)
-  screen.querySelector('.doc-search-field').addEventListener('click', () => {
-    if (!kbVisible) {
-      kbVisible = true;
-      kbPanel.style.display = 'block';
-      kbToggle.classList.add('active');
-    }
-  });
+  function onScanWhileOnScreen() {
+    if (!screen.isConnected) { window.removeEventListener('rfid:scan', onScanWhileOnScreen); return; }
+    renderPrintArea();
+  }
+  window.addEventListener('rfid:scan', onScanWhileOnScreen);
 
   enableTouchScroll(screen.querySelector('.doc-list-scroll'));
   screen.appendChild(makeBottomNav('home'));
-  renderDocs();
+  renderPrintArea();
   return screen;
 });
 
