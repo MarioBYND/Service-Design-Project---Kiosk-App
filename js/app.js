@@ -41,8 +41,8 @@ let lastScannedCardId = '';
 let currentUser = null;
 
 const DEMO_USERS_BY_CARD = {
-  '08007828B7': { id: 'u-001', name: 'Demo User One', program: 'Communication Design' },
-  '08006F1759': { id: 'u-002', name: 'Demo User Two', program: 'Industrial Design' },
+  '08007828B7': { id: 'u-001', name: 'Ken Wan',        program: 'Interaction Design', photo: 'assets/Ken-Wan.png' },
+  '08006F1759': { id: 'u-002', name: 'Max McDonough',  program: 'Interaction Design', photo: 'assets/Max-McDonough.png' },
 };
 
 function normalizeCardId(value) {
@@ -1032,19 +1032,18 @@ Router.register('profile', () => {
 
   const signedInMarkup = currentUser
     ? `
-      <div class="maint-body">
-        <div class="maint-icon">👤</div>
-        <h1 class="maint-title">${currentUser.name}</h1>
-        <p class="maint-text">Card ID: ${currentUser.cardId}</p>
-        <p class="maint-text">Program: ${currentUser.program}</p>
-        <button class="btn-next-step" id="signout-btn" style="max-width:320px;margin:16px auto 0;">Sign Out</button>
+      <div class="profile-body">
+        <img class="profile-photo" src="${currentUser.photo}" alt="${currentUser.name}" />
+        <div class="profile-name">${currentUser.name}</div>
+        <div class="profile-program">${currentUser.program}</div>
+        <button class="profile-signout-btn" id="signout-btn">Sign Out</button>
       </div>
     `
     : `
-      <div class="maint-body">
-        <div class="maint-icon">👤</div>
-        <h1 class="maint-title">Not Signed In</h1>
-        <p class="maint-text">Scan your card at the kiosk reader to sign in.</p>
+      <div class="profile-body">
+        <div class="profile-avatar">👤</div>
+        <div class="profile-name">Not Signed In</div>
+        <div class="profile-hint">Scan your card at the kiosk reader to sign in.</div>
       </div>
     `;
 

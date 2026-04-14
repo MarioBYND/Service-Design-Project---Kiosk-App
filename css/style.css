@@ -1707,6 +1707,15 @@ html, body {
   gap: 12px;
   padding: 32px 24px;
 }
+.profile-photo {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top;
+  border: 3px solid var(--gray-2);
+  margin-bottom: 4px;
+}
 .profile-avatar {
   font-size: 56px;
   line-height: 1;
@@ -1718,7 +1727,7 @@ html, body {
   color: var(--black);
   text-align: center;
 }
-.profile-id {
+.profile-program {
   font-size: 15px;
   color: var(--gray-3);
 }
