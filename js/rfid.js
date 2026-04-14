@@ -2,12 +2,23 @@
 // Connects to the Pi-side bridge and emits browser events on each scan.
 const RFID = (() => {
   const EVENTS_URL = 'http://127.0.0.1:8765/events';
+  const LAST_SCAN_URL = 'http://127.0.0.1:8765/last-scan';
   let source = null;
   let retryTimer = null;
+  let pollTimer = null;
   let connected = false;
+  let lastSeenScanKey = '';
 
   function emit(type, detail) {
     window.dispatchEvent(new CustomEvent(type, { detail }));
+  }
+
+  function handleScanPayload(payload) {
+    if (!payload || !payload.id) return;
+    const scanKey = String(payload.timestamp || '') + '|' + String(payload.id || '');
+    if (scanKey === lastSeenScanKey) return;
+    lastSeenScanKey = scanKey;
+    emit('rfid:scan', payload);
   }
 
   function connect() {
@@ -27,8 +38,7 @@ const RFID = (() => {
       source.addEventListener('scan', event => {
         try {
           const payload = JSON.parse(event.data || '{}');
-          if (!payload.id) return;
-          emit('rfid:scan', payload);
+          handleScanPayload(payload);
         } catch (_err) {
           // Ignore malformed payloads.
         }
@@ -46,6 +56,21 @@ const RFID = (() => {
     }
   }
 
+  function startPollingFallback() {
+    if (pollTimer) return;
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(LAST_SCAN_URL, { cache: 'no-store' });
+        if (!res.ok) return;
+        const body = await res.json();
+        if (!body || !body.last_scan) return;
+        handleScanPayload(body.last_scan);
+      } catch (_err) {
+        // Ignore polling errors; SSE may still be active.
+      }
+    }, 1200);
+  }
+
   function scheduleReconnect() {
     if (retryTimer) return;
     if (source) {
@@ -60,6 +85,7 @@ const RFID = (() => {
 
   function start() {
     connect();
+    startPollingFallback();
   }
 
   function stop() {
@@ -70,6 +96,10 @@ const RFID = (() => {
     if (source) {
       source.close();
       source = null;
+    }
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
     }
     connected = false;
     emit('rfid:status', { connected: false });
