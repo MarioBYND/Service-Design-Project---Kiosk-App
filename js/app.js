@@ -14,8 +14,8 @@ const RFID_USERS = {
 
 let currentUser = null;   // null = not signed in
 
-document.addEventListener('rfid-scan', (e) => {
-  const cardId = e.detail.cardId;
+window.addEventListener('rfid:scan', (e) => {
+  const cardId = (e.detail.id || '').toUpperCase();
   const user   = RFID_USERS[cardId];
   if (user) {
     currentUser = user;
