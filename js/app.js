@@ -65,12 +65,40 @@ function resolveUserFromCard(cardId) {
   };
 }
 
+function showScanToast(message) {
+  const existing = document.getElementById('rfid-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'rfid-toast';
+  toast.textContent = message;
+  toast.style.cssText = [
+    'position:fixed',
+    'top:14px',
+    'right:14px',
+    'z-index:9999',
+    'background:#111827',
+    'color:#fff',
+    'padding:10px 14px',
+    'border-radius:10px',
+    'font:600 14px/1.2 Inter,system-ui,sans-serif',
+    'box-shadow:0 8px 20px rgba(0,0,0,0.25)',
+  ].join(';');
+
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.remove(); }, 2200);
+}
+
 window.addEventListener('rfid:scan', e => {
   const cardId = normalizeCardId(e && e.detail && e.detail.id ? String(e.detail.id) : '');
   if (!cardId) return;
 
   lastScannedCardId = cardId;
   currentUser = resolveUserFromCard(cardId);
+  showScanToast('Signed in: ' + currentUser.name);
+
+  const homeSub = document.querySelector('.home-sub');
+  if (homeSub) homeSub.textContent = 'Signed in: ' + currentUser.name;
 
   // Avoid force re-rendering the current screen on every scan,
   // which can feel glitchy during touch interactions.
