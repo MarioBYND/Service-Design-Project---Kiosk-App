@@ -1878,6 +1878,8 @@ html, body {
   flex-direction: column;
   padding: 24px 18px 20px;
   gap: 12px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .feedback-question {
   font-size: 17px;

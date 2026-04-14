@@ -144,13 +144,20 @@ function makeBottomNav(activeItem = 'home') {
 (function () {
   var startY = 0, startX = 0, scrollEl = null, scrollAxis = 'y';
 
+  function canScrollY(el) {
+    var oy = window.getComputedStyle(el).overflowY;
+    return (oy === 'auto' || oy === 'scroll' || oy === 'overlay') &&
+           el.scrollHeight > el.clientHeight + 1;
+  }
+  function canScrollX(el) {
+    var ox = window.getComputedStyle(el).overflowX;
+    return (ox === 'auto' || ox === 'scroll' || ox === 'overlay') &&
+           el.scrollWidth > el.clientWidth + 1;
+  }
   function getScrollParent(el) {
     while (el && el !== document.body) {
-      var s = window.getComputedStyle(el);
-      if ((s.overflowY === 'auto' || s.overflowY === 'scroll') &&
-          el.scrollHeight > el.clientHeight + 1) return { el: el, axis: 'y' };
-      if ((s.overflowX === 'auto' || s.overflowX === 'scroll') &&
-          el.scrollWidth  > el.clientWidth  + 1) return { el: el, axis: 'x' };
+      if (canScrollY(el)) return { el: el, axis: 'y' };
+      if (canScrollX(el)) return { el: el, axis: 'x' };
       el = el.parentElement;
     }
     return null;
@@ -818,7 +825,6 @@ Router.register('print-feedback', () => {
         <button class="feedback-chip" data-tag="staff">👤 Staff Help</button>
       </div>
       <button class="btn-next-step" id="btn-submit" style="margin-top:auto;" disabled>Submit Feedback</button>
-      <button class="btn-done" id="btn-skip">Skip — Back to Home</button>
     </div>
   `;
 
@@ -839,7 +845,6 @@ Router.register('print-feedback', () => {
   });
 
   submitBtn.addEventListener('click', () => Router.go('feedback-thanks'));
-  screen.querySelector('#btn-skip').addEventListener('click', () => Router.go('home'));
   screen.appendChild(makeBottomNav('home'));
   return screen;
 });
