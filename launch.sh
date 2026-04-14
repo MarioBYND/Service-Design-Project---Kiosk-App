@@ -92,6 +92,7 @@ echo "[launch] Starting Chromium ($CHROMIUM_BIN)…"
 "$CHROMIUM_BIN" \
   --kiosk \
   --no-sandbox \
+  --password-store=basic \
   --disable-infobars \
   --disable-session-crashed-bubble \
   --disable-restore-session-state \
