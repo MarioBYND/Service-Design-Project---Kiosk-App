@@ -138,26 +138,43 @@ function makeBottomNav(activeItem = 'home') {
 
 
 // ── Touch scroll (RPi Chromium fix) ───────────────────────────
-// Global IIFE: walks the DOM upward from the touch target to find the
-// nearest scrollable ancestor, then drives its scrollTop/scrollLeft.
-// This covers every scroll container on every screen automatically.
+// RPi Chromium kiosk doesn't honour native touch-action:pan-y when
+// overflow:hidden is on html/body. This global IIFE manually drives
+// scrollTop/scrollLeft on the nearest scrollable ancestor.
+//
+// KEY POINTS:
+//  • touchmove uses { passive:false } so we can call preventDefault(),
+//    preventing Chromium from swallowing the event as a page gesture.
+//  • Detection uses known CSS class names first (reliable on old Blink),
+//    then falls back to computed overflowY check.
 (function () {
+  // Every scrollable container class in this app:
+  var SCROLL_Y_CLASSES = [
+    'screen-body', 'home-scroll', 'results-area', 'book-list-area',
+    'doc-list-scroll', 'feedback-body', 'charge-list-scroll', 'wizard-body-scroll'
+  ];
+  var SCROLL_X_CLASSES = ['stack-filter-row'];
+
   var startY = 0, startX = 0, scrollEl = null, scrollAxis = 'y';
 
-  function canScrollY(el) {
-    var oy = window.getComputedStyle(el).overflowY;
-    return (oy === 'auto' || oy === 'scroll' || oy === 'overlay') &&
-           el.scrollHeight > el.clientHeight + 1;
-  }
-  function canScrollX(el) {
-    var ox = window.getComputedStyle(el).overflowX;
-    return (ox === 'auto' || ox === 'scroll' || ox === 'overlay') &&
-           el.scrollWidth > el.clientWidth + 1;
-  }
   function getScrollParent(el) {
     while (el && el !== document.body) {
-      if (canScrollY(el)) return { el: el, axis: 'y' };
-      if (canScrollX(el)) return { el: el, axis: 'x' };
+      var cl = el.classList;
+      if (cl) {
+        if (SCROLL_Y_CLASSES.some(function(c){ return cl.contains(c); }) &&
+            el.scrollHeight > el.clientHeight + 1) return { el: el, axis: 'y' };
+        if (SCROLL_X_CLASSES.some(function(c){ return cl.contains(c); }) &&
+            el.scrollWidth  > el.clientWidth  + 1) return { el: el, axis: 'x' };
+      }
+      // Fallback: check computed style
+      try {
+        var oy = window.getComputedStyle(el).overflowY;
+        if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') &&
+             el.scrollHeight > el.clientHeight + 1) return { el: el, axis: 'y' };
+        var ox = window.getComputedStyle(el).overflowX;
+        if ((ox === 'auto' || ox === 'scroll' || ox === 'overlay') &&
+             el.scrollWidth  > el.clientWidth  + 1) return { el: el, axis: 'x' };
+      } catch(e) {}
       el = el.parentElement;
     }
     return null;
@@ -173,10 +190,11 @@ function makeBottomNav(activeItem = 'home') {
 
   document.addEventListener('touchmove', function (e) {
     if (!scrollEl) return;
+    e.preventDefault(); // stops Chromium treating this as a page-level gesture
     var t = e.touches[0];
     if (scrollAxis === 'y') { scrollEl.scrollTop  += startY - t.clientY; startY = t.clientY; }
     else                    { scrollEl.scrollLeft += startX - t.clientX; startX = t.clientX; }
-  }, { passive: true });
+  }, { passive: false }); // must be non-passive to allow preventDefault
 
   document.addEventListener('touchend',    function () { scrollEl = null; }, { passive: true });
   document.addEventListener('touchcancel', function () { scrollEl = null; }, { passive: true });
